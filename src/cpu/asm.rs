@@ -3,19 +3,8 @@ use std::io::Write;
 use bytemuck::bytes_of;
 use zendian::le::u16le;
 
-use super::instructions::{
-    ADCInstruction, ADDInstruction, ANDInstruction, BITInstruction, CPInstruction, CPLInstruction,
-    DECInstruction, INCInstruction, LDHInstruction, LDInstruction, ORInstruction, RESInstruction,
-    RLAInstruction, RLCAInstruction, RLCInstruction, RLInstruction, RRAInstruction,
-    RRCAInstruction, RRCInstruction, RRInstruction, SBCInstruction, SETInstruction, SUBInstruction,
-    XORInstruction,
-};
 use crate::cpu::{
-    instructions::{
-        CALLInstruction, CCFInstruction, JPInstruction, JRInstruction, RETIInstruction,
-        RETInstruction, RSTInstruction, SCFInstruction, SLAInstruction, SRAInstruction,
-        SRLInstruction, SWAPInstruction,
-    },
+    instructions::*,
     operand::ConditionCode,
     registers::{Register8, Register16},
 };
@@ -680,5 +669,67 @@ impl Assemble for CCFInstruction {
 impl Assemble for SCFInstruction {
     fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
         dest.write(&[0x37])
+    }
+}
+
+impl Assemble for POPInstruction {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
+        match self {
+            POPInstruction::AF => dest.write(&[0xF1]),
+            POPInstruction::R16(register16) => match register16 {
+                Register16::BC => dest.write(&[0xC1]),
+                Register16::DE => dest.write(&[0xD1]),
+                Register16::HL => dest.write(&[0xE1]),
+            },
+        }
+    }
+}
+
+impl Assemble for PUSHInstruction {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
+        match self {
+            PUSHInstruction::AF => dest.write(&[0xF5]),
+            PUSHInstruction::R16(register16) => match register16 {
+                Register16::BC => dest.write(&[0xC5]),
+                Register16::DE => dest.write(&[0xD5]),
+                Register16::HL => dest.write(&[0xE5]),
+            },
+        }
+    }
+}
+
+impl Assemble for DIInstruction {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
+        dest.write(&[0xF3])
+    }
+}
+
+impl Assemble for EIInstruction {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
+        dest.write(&[0xFB])
+    }
+}
+
+impl Assemble for HALTInstruction {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
+        dest.write(&[0x76])
+    }
+}
+
+impl Assemble for DAAInstruction {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
+        dest.write(&[0x27])
+    }
+}
+
+impl Assemble for NOPInstruction {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
+        dest.write(&[0x00])
+    }
+}
+
+impl Assemble for STOPInstruction {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
+        dest.write(&[0x10, 0x00])
     }
 }

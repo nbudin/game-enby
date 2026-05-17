@@ -589,3 +589,81 @@ impl Instruction for SCFInstruction {
         4
     }
 }
+
+#[derive(Debug)]
+pub enum POPInstruction {
+    AF,
+    R16(Register16),
+}
+
+impl Instruction for POPInstruction {
+    fn duration(&self) -> usize {
+        12
+    }
+}
+
+#[derive(Debug)]
+pub enum PUSHInstruction {
+    AF,
+    R16(Register16),
+}
+
+impl Instruction for PUSHInstruction {
+    fn duration(&self) -> usize {
+        16
+    }
+}
+
+#[derive(Debug)]
+pub enum DIInstruction {}
+
+impl Instruction for DIInstruction {
+    fn duration(&self) -> usize {
+        4
+    }
+}
+
+#[derive(Debug)]
+pub enum EIInstruction {}
+
+impl Instruction for EIInstruction {
+    fn duration(&self) -> usize {
+        4
+    }
+}
+
+#[derive(Debug)]
+pub enum HALTInstruction {}
+
+impl Instruction for HALTInstruction {
+    fn duration(&self) -> usize {
+        4
+    }
+}
+
+#[derive(Debug)]
+pub enum DAAInstruction {}
+
+impl Instruction for DAAInstruction {
+    fn duration(&self) -> usize {
+        4
+    }
+}
+
+#[derive(Debug)]
+pub enum NOPInstruction {}
+
+impl Instruction for NOPInstruction {
+    fn duration(&self) -> usize {
+        4
+    }
+}
+
+#[derive(Debug)]
+pub enum STOPInstruction {}
+
+impl Instruction for STOPInstruction {
+    fn duration(&self) -> usize {
+        4
+    }
+}
