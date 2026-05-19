@@ -1,9 +1,12 @@
+use enum_dispatch::enum_dispatch;
+use std::{any::type_name, fmt::Debug, io::Write};
 use strum::FromRepr;
 
 use crate::cpu::{
+    CPU,
     asm::Assemble,
     operand::ConditionCode,
-    registers::{Register8, Register16},
+    registers::{CPUFlags, Register8, Register16},
 };
 
 #[derive(Debug, FromRepr, Copy, Clone)]
@@ -32,8 +35,62 @@ pub enum ResetVector {
     Addr38 = 0x38,
 }
 
-pub trait Instruction: Assemble {
+#[enum_dispatch]
+pub trait InstructionBehavior: Assemble {
     fn duration(&self) -> usize;
+
+    fn execute(&self, cpu: &mut CPU) {
+        todo!("{}", type_name::<Self>());
+    }
+}
+
+#[enum_dispatch(Assemble, InstructionBehavior)]
+#[derive(Debug)]
+pub enum Instruction {
+    LDInstruction,
+    LDHInstruction,
+    ADCInstruction,
+    ADDInstruction,
+    CPInstruction,
+    DECInstruction,
+    INCInstruction,
+    SBCInstruction,
+    SUBInstruction,
+    ANDInstruction,
+    CPLInstruction,
+    ORInstruction,
+    XORInstruction,
+    BITInstruction,
+    RESInstruction,
+    SETInstruction,
+    RLInstruction,
+    RLAInstruction,
+    RLCInstruction,
+    RLCAInstruction,
+    RRInstruction,
+    RRAInstruction,
+    RRCInstruction,
+    RRCAInstruction,
+    SLAInstruction,
+    SRAInstruction,
+    SRLInstruction,
+    SWAPInstruction,
+    CALLInstruction,
+    JPInstruction,
+    JRInstruction,
+    RETInstruction,
+    RETIInstruction,
+    RSTInstruction,
+    CCFInstruction,
+    SCFInstruction,
+    POPInstruction,
+    PUSHInstruction,
+    DIInstruction,
+    EIInstruction,
+    HALTInstruction,
+    DAAInstruction,
+    NOPInstruction,
+    STOPInstruction,
 }
 
 #[derive(Debug)]
@@ -58,7 +115,30 @@ pub enum LDInstruction {
     SPHL,
 }
 
-impl Instruction for LDInstruction {
+impl InstructionBehavior for LDInstruction {
+    fn execute(&self, cpu: &mut CPU) {
+        match self {
+            LDInstruction::R8R8(register8, register9) => todo!(),
+            LDInstruction::R8N8(to, value) => cpu.registers.set_r8(*to, *value),
+            LDInstruction::R16N16(register16, _) => todo!(),
+            LDInstruction::SPN16(_) => todo!(),
+            LDInstruction::N16SP(_) => todo!(),
+            LDInstruction::HLR8(register8) => todo!(),
+            LDInstruction::HLN8(_) => todo!(),
+            LDInstruction::R8HL(register8) => todo!(),
+            LDInstruction::R16A(register16) => todo!(),
+            LDInstruction::N16A(_) => todo!(),
+            LDInstruction::AR16(register16) => todo!(),
+            LDInstruction::AN16(_) => todo!(),
+            LDInstruction::HLIA => todo!(),
+            LDInstruction::HLDA => todo!(),
+            LDInstruction::AHLI => todo!(),
+            LDInstruction::AHLD => todo!(),
+            LDInstruction::HLSPE8(_) => todo!(),
+            LDInstruction::SPHL => todo!(),
+        }
+    }
+
     fn duration(&self) -> usize {
         match self {
             LDInstruction::R8R8(_, _) => 4,
@@ -91,7 +171,16 @@ pub enum LDHInstruction {
     AC,
 }
 
-impl Instruction for LDHInstruction {
+impl InstructionBehavior for LDHInstruction {
+    fn execute(&self, cpu: &mut CPU) {
+        match self {
+            LDHInstruction::N8A(offset) => todo!(),
+            LDHInstruction::CA => todo!(),
+            LDHInstruction::AN8(_) => todo!(),
+            LDHInstruction::AC => todo!(),
+        }
+    }
+
     fn duration(&self) -> usize {
         match self {
             LDHInstruction::N8A(_) => 12,
@@ -115,7 +204,7 @@ pub enum ADCInstruction {
     An8(u8),
 }
 
-impl Instruction for ADCInstruction {
+impl InstructionBehavior for ADCInstruction {
     fn duration(&self) -> usize {
         match self {
             ADCInstruction::AHL | ADCInstruction::An8(_) => 8,
@@ -134,7 +223,7 @@ pub enum ADDInstruction {
     HLSP,
 }
 
-impl Instruction for ADDInstruction {
+impl InstructionBehavior for ADDInstruction {
     fn duration(&self) -> usize {
         match self {
             ADDInstruction::HLR16(_) | ADDInstruction::HLSP | ADDInstruction::AHL => 8,
@@ -152,7 +241,7 @@ pub enum CPInstruction {
     AN8(u8),
 }
 
-impl Instruction for CPInstruction {
+impl InstructionBehavior for CPInstruction {
     fn duration(&self) -> usize {
         match self {
             CPInstruction::AR8(_) => 4,
@@ -170,7 +259,7 @@ pub enum DECInstruction {
     SP,
 }
 
-impl Instruction for DECInstruction {
+impl InstructionBehavior for DECInstruction {
     fn duration(&self) -> usize {
         match self {
             DECInstruction::R8(_) => 4,
@@ -189,7 +278,7 @@ pub enum INCInstruction {
     SP,
 }
 
-impl Instruction for INCInstruction {
+impl InstructionBehavior for INCInstruction {
     fn duration(&self) -> usize {
         match self {
             INCInstruction::R8(_) => 4,
@@ -207,7 +296,7 @@ pub enum SBCInstruction {
     AN8(u8),
 }
 
-impl Instruction for SBCInstruction {
+impl InstructionBehavior for SBCInstruction {
     fn duration(&self) -> usize {
         todo!()
     }
@@ -220,7 +309,7 @@ pub enum SUBInstruction {
     AN8(u8),
 }
 
-impl Instruction for SUBInstruction {
+impl InstructionBehavior for SUBInstruction {
     fn duration(&self) -> usize {
         match self {
             SUBInstruction::AR8(_) => 4,
@@ -237,7 +326,7 @@ pub enum ANDInstruction {
     AN8(u8),
 }
 
-impl Instruction for ANDInstruction {
+impl InstructionBehavior for ANDInstruction {
     fn duration(&self) -> usize {
         match self {
             ANDInstruction::AR8(_) => 4,
@@ -250,7 +339,7 @@ impl Instruction for ANDInstruction {
 #[derive(Debug)]
 pub enum CPLInstruction {}
 
-impl Instruction for CPLInstruction {
+impl InstructionBehavior for CPLInstruction {
     fn duration(&self) -> usize {
         4
     }
@@ -263,7 +352,7 @@ pub enum ORInstruction {
     AN8(u8),
 }
 
-impl Instruction for ORInstruction {
+impl InstructionBehavior for ORInstruction {
     fn duration(&self) -> usize {
         match self {
             ORInstruction::AR8(_) => 4,
@@ -280,7 +369,7 @@ pub enum XORInstruction {
     AN8(u8),
 }
 
-impl Instruction for XORInstruction {
+impl InstructionBehavior for XORInstruction {
     fn duration(&self) -> usize {
         match self {
             XORInstruction::AR8(_) => 4,
@@ -296,7 +385,7 @@ pub enum BITInstruction {
     U3HL(BitOffset),
 }
 
-impl Instruction for BITInstruction {
+impl InstructionBehavior for BITInstruction {
     fn duration(&self) -> usize {
         match self {
             BITInstruction::U3R8(_, _) => 8,
@@ -311,7 +400,7 @@ pub enum RESInstruction {
     U3HL(BitOffset),
 }
 
-impl Instruction for RESInstruction {
+impl InstructionBehavior for RESInstruction {
     fn duration(&self) -> usize {
         match self {
             RESInstruction::U3R8(_, _) => 8,
@@ -326,7 +415,7 @@ pub enum SETInstruction {
     U3HL(BitOffset),
 }
 
-impl Instruction for SETInstruction {
+impl InstructionBehavior for SETInstruction {
     fn duration(&self) -> usize {
         match self {
             SETInstruction::U3R8(_, _) => 8,
@@ -341,7 +430,7 @@ pub enum RLInstruction {
     HL,
 }
 
-impl Instruction for RLInstruction {
+impl InstructionBehavior for RLInstruction {
     fn duration(&self) -> usize {
         match self {
             RLInstruction::R8(_) => 8,
@@ -351,9 +440,11 @@ impl Instruction for RLInstruction {
 }
 
 #[derive(Debug)]
-pub enum RLAInstruction {}
+pub enum RLAInstruction {
+    Empty,
+}
 
-impl Instruction for RLAInstruction {
+impl InstructionBehavior for RLAInstruction {
     fn duration(&self) -> usize {
         4
     }
@@ -365,7 +456,7 @@ pub enum RLCInstruction {
     HL,
 }
 
-impl Instruction for RLCInstruction {
+impl InstructionBehavior for RLCInstruction {
     fn duration(&self) -> usize {
         match self {
             RLCInstruction::R8(_) => 8,
@@ -375,9 +466,11 @@ impl Instruction for RLCInstruction {
 }
 
 #[derive(Debug)]
-pub enum RLCAInstruction {}
+pub enum RLCAInstruction {
+    Empty,
+}
 
-impl Instruction for RLCAInstruction {
+impl InstructionBehavior for RLCAInstruction {
     fn duration(&self) -> usize {
         4
     }
@@ -389,7 +482,7 @@ pub enum RRInstruction {
     HL,
 }
 
-impl Instruction for RRInstruction {
+impl InstructionBehavior for RRInstruction {
     fn duration(&self) -> usize {
         match self {
             RRInstruction::R8(_) => 8,
@@ -401,7 +494,7 @@ impl Instruction for RRInstruction {
 #[derive(Debug)]
 pub enum RRAInstruction {}
 
-impl Instruction for RRAInstruction {
+impl InstructionBehavior for RRAInstruction {
     fn duration(&self) -> usize {
         4
     }
@@ -413,7 +506,7 @@ pub enum RRCInstruction {
     HL,
 }
 
-impl Instruction for RRCInstruction {
+impl InstructionBehavior for RRCInstruction {
     fn duration(&self) -> usize {
         match self {
             RRCInstruction::R8(_) => 8,
@@ -423,9 +516,11 @@ impl Instruction for RRCInstruction {
 }
 
 #[derive(Debug)]
-pub enum RRCAInstruction {}
+pub enum RRCAInstruction {
+    Empty,
+}
 
-impl Instruction for RRCAInstruction {
+impl InstructionBehavior for RRCAInstruction {
     fn duration(&self) -> usize {
         4
     }
@@ -437,7 +532,7 @@ pub enum SLAInstruction {
     HL,
 }
 
-impl Instruction for SLAInstruction {
+impl InstructionBehavior for SLAInstruction {
     fn duration(&self) -> usize {
         match self {
             SLAInstruction::R8(_) => 8,
@@ -452,7 +547,7 @@ pub enum SRAInstruction {
     HL,
 }
 
-impl Instruction for SRAInstruction {
+impl InstructionBehavior for SRAInstruction {
     fn duration(&self) -> usize {
         match self {
             SRAInstruction::R8(_) => 8,
@@ -467,7 +562,7 @@ pub enum SRLInstruction {
     HL,
 }
 
-impl Instruction for SRLInstruction {
+impl InstructionBehavior for SRLInstruction {
     fn duration(&self) -> usize {
         match self {
             SRLInstruction::R8(_) => 8,
@@ -482,7 +577,7 @@ pub enum SWAPInstruction {
     HL,
 }
 
-impl Instruction for SWAPInstruction {
+impl InstructionBehavior for SWAPInstruction {
     fn duration(&self) -> usize {
         match self {
             SWAPInstruction::R8(_) => 8,
@@ -497,7 +592,7 @@ pub enum CALLInstruction {
     CCN16(ConditionCode, u16),
 }
 
-impl Instruction for CALLInstruction {
+impl InstructionBehavior for CALLInstruction {
     fn duration(&self) -> usize {
         match self {
             CALLInstruction::N16(_) => 24,
@@ -513,7 +608,25 @@ pub enum JPInstruction {
     CCN16(ConditionCode, u16),
 }
 
-impl Instruction for JPInstruction {
+impl InstructionBehavior for JPInstruction {
+    fn execute(&self, cpu: &mut CPU) {
+        let target_addr = match self {
+            JPInstruction::HL => Some(cpu.registers.hl.into_bits()),
+            JPInstruction::N16(addr) => Some(*addr),
+            JPInstruction::CCN16(condition_code, addr) => {
+                if condition_code.matches(cpu) {
+                    Some(*addr)
+                } else {
+                    None
+                }
+            }
+        };
+
+        if let Some(target_addr) = target_addr {
+            cpu.registers.pc = target_addr;
+        }
+    }
+
     fn duration(&self) -> usize {
         match self {
             JPInstruction::HL => 4,
@@ -529,7 +642,7 @@ pub enum JRInstruction {
     CCE8(ConditionCode, i8),
 }
 
-impl Instruction for JRInstruction {
+impl InstructionBehavior for JRInstruction {
     fn duration(&self) -> usize {
         match self {
             JRInstruction::E8(_) => 12,
@@ -544,7 +657,7 @@ pub enum RETInstruction {
     Unconditional,
 }
 
-impl Instruction for RETInstruction {
+impl InstructionBehavior for RETInstruction {
     fn duration(&self) -> usize {
         match self {
             RETInstruction::Conditional(_) => 8,
@@ -556,26 +669,36 @@ impl Instruction for RETInstruction {
 #[derive(Debug)]
 pub enum RETIInstruction {}
 
-impl Instruction for RETIInstruction {
-    fn duration(&self) -> usize {
-        16
-    }
-}
-
-pub enum RSTInstruction {
-    ResetVector(ResetVector),
-}
-
-impl Instruction for RSTInstruction {
+impl InstructionBehavior for RETIInstruction {
     fn duration(&self) -> usize {
         16
     }
 }
 
 #[derive(Debug)]
-pub enum CCFInstruction {}
+pub enum RSTInstruction {
+    ResetVector(ResetVector),
+}
 
-impl Instruction for CCFInstruction {
+impl InstructionBehavior for RSTInstruction {
+    fn duration(&self) -> usize {
+        16
+    }
+}
+
+#[derive(Debug)]
+pub enum CCFInstruction {
+    Empty,
+}
+
+impl InstructionBehavior for CCFInstruction {
+    fn execute(&self, cpu: &mut CPU) {
+        let f = &mut cpu.registers.af.f();
+        f.set_c(!f.c());
+        f.set_n(false);
+        f.set_h(false);
+    }
+
     fn duration(&self) -> usize {
         4
     }
@@ -584,7 +707,7 @@ impl Instruction for CCFInstruction {
 #[derive(Debug)]
 pub enum SCFInstruction {}
 
-impl Instruction for SCFInstruction {
+impl InstructionBehavior for SCFInstruction {
     fn duration(&self) -> usize {
         4
     }
@@ -596,7 +719,7 @@ pub enum POPInstruction {
     R16(Register16),
 }
 
-impl Instruction for POPInstruction {
+impl InstructionBehavior for POPInstruction {
     fn duration(&self) -> usize {
         12
     }
@@ -608,61 +731,75 @@ pub enum PUSHInstruction {
     R16(Register16),
 }
 
-impl Instruction for PUSHInstruction {
+impl InstructionBehavior for PUSHInstruction {
     fn duration(&self) -> usize {
         16
     }
 }
 
 #[derive(Debug)]
-pub enum DIInstruction {}
+pub enum DIInstruction {
+    Empty,
+}
 
-impl Instruction for DIInstruction {
+impl InstructionBehavior for DIInstruction {
     fn duration(&self) -> usize {
         4
     }
 }
 
 #[derive(Debug)]
-pub enum EIInstruction {}
+pub enum EIInstruction {
+    Empty,
+}
 
-impl Instruction for EIInstruction {
+impl InstructionBehavior for EIInstruction {
     fn duration(&self) -> usize {
         4
     }
 }
 
 #[derive(Debug)]
-pub enum HALTInstruction {}
+pub enum HALTInstruction {
+    Empty,
+}
 
-impl Instruction for HALTInstruction {
+impl InstructionBehavior for HALTInstruction {
     fn duration(&self) -> usize {
         4
     }
 }
 
 #[derive(Debug)]
-pub enum DAAInstruction {}
+pub enum DAAInstruction {
+    Empty,
+}
 
-impl Instruction for DAAInstruction {
+impl InstructionBehavior for DAAInstruction {
     fn duration(&self) -> usize {
         4
     }
 }
 
 #[derive(Debug)]
-pub enum NOPInstruction {}
+pub enum NOPInstruction {
+    Empty,
+}
 
-impl Instruction for NOPInstruction {
+impl InstructionBehavior for NOPInstruction {
+    fn execute(&self, cpu: &mut CPU) {}
+
     fn duration(&self) -> usize {
         4
     }
 }
 
 #[derive(Debug)]
-pub enum STOPInstruction {}
+pub enum STOPInstruction {
+    Empty,
+}
 
-impl Instruction for STOPInstruction {
+impl InstructionBehavior for STOPInstruction {
     fn duration(&self) -> usize {
         4
     }

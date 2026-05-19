@@ -5,20 +5,20 @@ pub struct CPUFlags {
     #[bits(4)]
     _unused: u8,
     /// carry flag
-    c: bool,
+    pub c: bool,
     /// half-carry flag (BCD)
-    h: bool,
+    pub h: bool,
     /// subtraction flag (BCD)
-    n: bool,
+    pub n: bool,
     /// zero flag
-    z: bool,
+    pub z: bool,
 }
 
 #[bitfield(u16)]
 pub struct AFRegister {
     #[bits(8)]
-    f: CPUFlags,
-    a: u8,
+    pub f: CPUFlags,
+    pub a: u8,
 }
 
 #[bitfield(u16)]
@@ -48,7 +48,21 @@ pub struct CPURegisters {
     pub pc: u16,
 }
 
-#[derive(Debug)]
+impl CPURegisters {
+    pub fn set_r8(&mut self, r8: Register8, value: u8) {
+        match r8 {
+            Register8::A => self.af.set_a(value),
+            Register8::B => self.bc.set_b(value),
+            Register8::C => self.bc.set_c(value),
+            Register8::D => self.de.set_d(value),
+            Register8::E => self.de.set_e(value),
+            Register8::H => self.hl.set_h(value),
+            Register8::L => self.hl.set_l(value),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum Register8 {
     A,
     B,

@@ -1,4 +1,7 @@
-use crate::cpu::registers::{Register8, Register16};
+use crate::cpu::{
+    CPU,
+    registers::{Register8, Register16},
+};
 
 #[derive(Debug)]
 pub enum ConditionCode {
@@ -6,6 +9,17 @@ pub enum ConditionCode {
     NZ,
     C,
     NC,
+}
+
+impl ConditionCode {
+    pub fn matches(&self, cpu: &CPU) -> bool {
+        match self {
+            ConditionCode::Z => cpu.registers.af.f().z(),
+            ConditionCode::NZ => !cpu.registers.af.f().z(),
+            ConditionCode::C => cpu.registers.af.f().c(),
+            ConditionCode::NC => !cpu.registers.af.f().c(),
+        }
+    }
 }
 
 #[derive(Debug)]
