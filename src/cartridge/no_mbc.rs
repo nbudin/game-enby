@@ -1,10 +1,7 @@
 use crate::{
-    bus::{
-        Bus,
-        bus_interceptor::{BusInterceptor, InterceptorResult},
-    },
+    bus::bus_interceptor::{BusInterceptor, InterceptorResult},
     cartridge::CartridgeBehavior,
-    cpu::cpu_bus::CPUBus,
+    cpu::cpu_bus::{CPUBus, CPUBusTrait},
 };
 
 pub struct NoMBCCPUBusInterceptor {
@@ -52,11 +49,11 @@ impl NoMBC {
 }
 
 impl CartridgeBehavior for NoMBC {
-    fn cpu_bus(&self) -> &dyn Bus<u16> {
+    fn cpu_bus(&self) -> &dyn CPUBusTrait {
         &self.cpu_bus
     }
 
-    fn cpu_bus_mut(&mut self) -> &mut dyn Bus<u16> {
+    fn cpu_bus_mut(&mut self) -> &mut dyn CPUBusTrait {
         &mut self.cpu_bus
     }
 }

@@ -39,6 +39,28 @@ pub struct HLRegister {
     h: u8,
 }
 
+#[bitfield(u8)]
+pub struct IERegister {
+    pub vblank: bool,
+    pub lcd: bool,
+    pub timer: bool,
+    pub serial: bool,
+    pub joypad: bool,
+    #[bits(3)]
+    _unused: u8,
+}
+
+#[bitfield(u8)]
+pub struct IFRegister {
+    pub vblank: bool,
+    pub lcd: bool,
+    pub timer: bool,
+    pub serial: bool,
+    pub joypad: bool,
+    #[bits(3)]
+    _unused: u8,
+}
+
 pub struct CPURegisters {
     pub af: AFRegister,
     pub bc: BCRegister,
@@ -46,6 +68,8 @@ pub struct CPURegisters {
     pub hl: HLRegister,
     pub sp: u16,
     pub pc: u16,
+    pub interrupt_enable: IERegister,
+    pub interrupt_flag: IFRegister,
 }
 
 impl CPURegisters {

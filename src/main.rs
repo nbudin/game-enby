@@ -30,8 +30,9 @@ impl Machine {
 impl Read for Machine {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         for i in 0..buf.len() {
-            buf[i] = self.cartridge.cpu_bus_mut().read(self.cpu.registers.pc);
-            self.cpu.registers.pc += 1;
+            let pc = self.cartridge.cpu_bus().registers().pc;
+            buf[i] = self.cartridge.cpu_bus_mut().read(pc);
+            self.cartridge.cpu_bus_mut().registers_mut().pc += 1;
         }
 
         Ok(buf.len())
@@ -49,6 +50,6 @@ fn main() {
     for _i in 1..10 {
         let instruction = read_instruction(&mut machine).unwrap();
         println!("{:?}", instruction);
-        instruction.execute(&mut machine.cpu);
+        instruction.execute(&mut machine);
     }
 }

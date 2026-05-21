@@ -2,11 +2,15 @@ use enum_dispatch::enum_dispatch;
 use std::{any::type_name, fmt::Debug, io::Write};
 use strum::FromRepr;
 
-use crate::cpu::{
-    CPU,
-    asm::Assemble,
-    operand::ConditionCode,
-    registers::{CPUFlags, Register8, Register16},
+use crate::{
+    Machine,
+    cartridge::CartridgeBehavior,
+    cpu::{
+        CPU,
+        asm::Assemble,
+        operand::ConditionCode,
+        registers::{CPUFlags, Register8, Register16},
+    },
 };
 
 #[derive(Debug, FromRepr, Copy, Clone)]
@@ -39,7 +43,7 @@ pub enum ResetVector {
 pub trait InstructionBehavior: Assemble {
     fn duration(&self) -> usize;
 
-    fn execute(&self, cpu: &mut CPU) {
+    fn execute(&self, machine: &mut Machine) {
         todo!("{}", type_name::<Self>());
     }
 }
@@ -116,10 +120,14 @@ pub enum LDInstruction {
 }
 
 impl InstructionBehavior for LDInstruction {
-    fn execute(&self, cpu: &mut CPU) {
+    fn execute(&self, machine: &mut Machine) {
         match self {
             LDInstruction::R8R8(register8, register9) => todo!(),
-            LDInstruction::R8N8(to, value) => cpu.registers.set_r8(*to, *value),
+            LDInstruction::R8N8(to, value) => machine
+                .cartridge
+                .cpu_bus_mut()
+                .registers_mut()
+                .set_r8(*to, *value),
             LDInstruction::R16N16(register16, _) => todo!(),
             LDInstruction::SPN16(_) => todo!(),
             LDInstruction::N16SP(_) => todo!(),
@@ -172,9 +180,15 @@ pub enum LDHInstruction {
 }
 
 impl InstructionBehavior for LDHInstruction {
-    fn execute(&self, cpu: &mut CPU) {
+    fn execute(&self, machine: &mut Machine) {
         match self {
-            LDHInstruction::N8A(offset) => todo!(),
+            LDHInstruction::N8A(offset) => {
+                let value = machine.cartridge.cpu_bus().registers().af.a();
+                machine
+                    .cartridge
+                    .cpu_bus_mut()
+                    .write(0xFF00 + (*offset as u16), value);
+            }
             LDHInstruction::CA => todo!(),
             LDHInstruction::AN8(_) => todo!(),
             LDHInstruction::AC => todo!(),
@@ -609,12 +623,12 @@ pub enum JPInstruction {
 }
 
 impl InstructionBehavior for JPInstruction {
-    fn execute(&self, cpu: &mut CPU) {
+    fn execute(&self, machine: &mut Machine) {
         let target_addr = match self {
-            JPInstruction::HL => Some(cpu.registers.hl.into_bits()),
+            JPInstruction::HL => Some(machine.cartridge.cpu_bus().registers().hl.into_bits()),
             JPInstruction::N16(addr) => Some(*addr),
             JPInstruction::CCN16(condition_code, addr) => {
-                if condition_code.matches(cpu) {
+                if condition_code.matches(machine.cartridge.cpu_bus().registers()) {
                     Some(*addr)
                 } else {
                     None
@@ -623,7 +637,7 @@ impl InstructionBehavior for JPInstruction {
         };
 
         if let Some(target_addr) = target_addr {
-            cpu.registers.pc = target_addr;
+            machine.cartridge.cpu_bus_mut().registers_mut().pc = target_addr;
         }
     }
 
@@ -667,9 +681,16 @@ impl InstructionBehavior for RETInstruction {
 }
 
 #[derive(Debug)]
-pub enum RETIInstruction {}
+pub enum RETIInstruction {
+    Empty,
+}
 
 impl InstructionBehavior for RETIInstruction {
+    fn execute(&self, machine: &mut Machine) {
+        EIInstruction::Empty.execute(machine);
+        RETInstruction::Unconditional.execute(machine);
+    }
+
     fn duration(&self) -> usize {
         16
     }
@@ -692,8 +713,8 @@ pub enum CCFInstruction {
 }
 
 impl InstructionBehavior for CCFInstruction {
-    fn execute(&self, cpu: &mut CPU) {
-        let f = &mut cpu.registers.af.f();
+    fn execute(&self, machine: &mut Machine) {
+        let f = &mut machine.cartridge.cpu_bus_mut().registers_mut().af.f();
         f.set_c(!f.c());
         f.set_n(false);
         f.set_h(false);
@@ -743,6 +764,13 @@ pub enum DIInstruction {
 }
 
 impl InstructionBehavior for DIInstruction {
+    fn execute(&self, machine: &mut Machine) {
+        machine
+            .cartridge
+            .cpu_bus_mut()
+            .set_interrupt_master_enable(false);
+    }
+
     fn duration(&self) -> usize {
         4
     }
@@ -754,6 +782,13 @@ pub enum EIInstruction {
 }
 
 impl InstructionBehavior for EIInstruction {
+    fn execute(&self, machine: &mut Machine) {
+        machine
+            .cartridge
+            .cpu_bus_mut()
+            .set_interrupt_master_enable(true);
+    }
+
     fn duration(&self) -> usize {
         4
     }
@@ -787,7 +822,7 @@ pub enum NOPInstruction {
 }
 
 impl InstructionBehavior for NOPInstruction {
-    fn execute(&self, cpu: &mut CPU) {}
+    fn execute(&self, machine: &mut Machine) {}
 
     fn duration(&self) -> usize {
         4

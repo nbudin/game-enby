@@ -1,13 +1,13 @@
 use enum_dispatch::enum_dispatch;
 
-use crate::{bus::Bus, cartridge::no_mbc::NoMBC};
+use crate::{bus::Bus, cartridge::no_mbc::NoMBC, cpu::cpu_bus::CPUBusTrait};
 
 pub mod no_mbc;
 
 #[enum_dispatch]
 pub trait CartridgeBehavior {
-    fn cpu_bus(&self) -> &dyn Bus<u16>;
-    fn cpu_bus_mut(&mut self) -> &mut dyn Bus<u16>;
+    fn cpu_bus(&self) -> &dyn CPUBusTrait;
+    fn cpu_bus_mut(&mut self) -> &mut dyn CPUBusTrait;
 }
 
 #[enum_dispatch(CartridgeBehavior)]
