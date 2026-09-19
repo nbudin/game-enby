@@ -1,4 +1,5 @@
 use bitfield_struct::bitfield;
+use strum::AsRefStr;
 
 #[bitfield(u8)]
 pub struct CPUFlags {
@@ -98,7 +99,7 @@ impl CPURegisters {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, AsRefStr)]
 pub enum Register8 {
     A,
     B,
@@ -109,7 +110,7 @@ pub enum Register8 {
     L,
 }
 
-#[derive(Debug)]
+#[derive(Debug, AsRefStr)]
 pub enum Register16 {
     BC,
     DE,

@@ -1,4 +1,7 @@
-use std::io::Read;
+use std::{
+    fmt::{Debug, Display},
+    io::Read,
+};
 
 use bytemuck::checked::from_bytes;
 use zendian::le::u16le;
@@ -75,4 +78,105 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
 
         _ => todo!("Unknown opcode: {:02X}", opcode),
     })
+}
+
+impl Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Instruction::CCFInstruction(_) => f.write_str("CCF"),
+            Instruction::CPInstruction(instruction) => Display::fmt(&instruction, f),
+            Instruction::LDInstruction(instruction) => Display::fmt(&instruction, f),
+            Instruction::LDHInstruction(instruction) => Display::fmt(&instruction, f),
+            Instruction::JPInstruction(instruction) => Display::fmt(&instruction, f),
+            Instruction::JRInstruction(instruction) => Display::fmt(&instruction, f),
+            Instruction::NOPInstruction(_) => f.write_str("NOP"),
+            Instruction::XORInstruction(instruction) => Display::fmt(&instruction, f),
+            _ => todo!("{:?}", self),
+        }
+    }
+}
+
+impl Display for CPInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CPInstruction::AR8(register8) => {
+                f.write_fmt(format_args!("CP A, {}", register8.as_ref()))
+            }
+            CPInstruction::AHL => f.write_str("CP A, [HL]"),
+            CPInstruction::AN8(value) => f.write_fmt(format_args!("CP A, 0x{:02X}", value)),
+        }
+    }
+}
+
+impl Display for JRInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JRInstruction::E8(offset) => f.write_fmt(format_args!("JR {}", offset)),
+            JRInstruction::CCE8(condition_code, offset) => {
+                f.write_fmt(format_args!("JR {}, {}", condition_code.as_ref(), offset))
+            }
+        }
+    }
+}
+
+impl Display for LDInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LDInstruction::R8R8(destination, source) => todo!(),
+            LDInstruction::R8N8(destination, value) => {
+                f.write_fmt(format_args!("LD {}, 0x{:02X}", destination.as_ref(), value))
+            }
+            LDInstruction::R16N16(register16, _) => todo!(),
+            LDInstruction::SPN16(_) => todo!(),
+            LDInstruction::N16SP(_) => todo!(),
+            LDInstruction::HLR8(register8) => todo!(),
+            LDInstruction::HLN8(_) => todo!(),
+            LDInstruction::R8HL(register8) => todo!(),
+            LDInstruction::R16A(register16) => todo!(),
+            LDInstruction::N16A(_) => todo!(),
+            LDInstruction::AR16(register16) => todo!(),
+            LDInstruction::AN16(_) => todo!(),
+            LDInstruction::HLIA => todo!(),
+            LDInstruction::HLDA => todo!(),
+            LDInstruction::AHLI => todo!(),
+            LDInstruction::AHLD => todo!(),
+            LDInstruction::HLSPE8(_) => todo!(),
+            LDInstruction::SPHL => todo!(),
+        }
+    }
+}
+
+impl Display for LDHInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LDHInstruction::N8A(offset) => f.write_fmt(format_args!("LDH A, [0x{:02X}]", offset)),
+            LDHInstruction::CA => f.write_str("LDH [C], A"),
+            LDHInstruction::AN8(offset) => f.write_fmt(format_args!("LDH [0x{:02X}], A", offset)),
+            LDHInstruction::AC => f.write_str("LDH A, [C]"),
+        }
+    }
+}
+
+impl Display for JPInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JPInstruction::HL => f.write_str("JP HL"),
+            JPInstruction::N16(addr) => f.write_fmt(format_args!("JP ${:04X}", addr)),
+            JPInstruction::CCN16(condition_code, addr) => {
+                f.write_fmt(format_args!("JP {},${:04X}", condition_code.as_ref(), addr))
+            }
+        }
+    }
+}
+
+impl Display for XORInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            XORInstruction::AR8(register8) => {
+                f.write_fmt(format_args!("XOR A, {}", register8.as_ref()))
+            }
+            XORInstruction::AHL => f.write_str("XOR A, HL"),
+            XORInstruction::AN8(value) => f.write_fmt(format_args!("XOR A, 0x{:02X}", value)),
+        }
+    }
 }
