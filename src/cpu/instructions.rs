@@ -1,16 +1,18 @@
 use enum_dispatch::enum_dispatch;
-use std::{any::type_name, fmt::Debug, io::Write};
+use std::{
+    any::type_name,
+    fmt::Debug,
+    io::Write,
+    sync::{Arc, RwLock},
+};
 use strum::FromRepr;
 
-use crate::{
-    Machine,
-    cartridge::CartridgeBehavior,
-    cpu::{
-        CPU,
-        asm::Assemble,
-        operand::ConditionCode,
-        registers::{CPUFlags, Register8, Register16},
-    },
+use crate::cpu::{
+    CPU,
+    asm::Assemble,
+    cpu_bus::CPUBusTrait,
+    operand::ConditionCode,
+    registers::{Register8, Register16},
 };
 
 #[derive(Debug, FromRepr, Copy, Clone)]
@@ -43,7 +45,7 @@ pub enum ResetVector {
 pub trait InstructionBehavior: Assemble {
     fn duration(&self) -> usize;
 
-    fn execute(&self, machine: &mut Machine) {
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
         todo!("{}", type_name::<Self>());
     }
 }
@@ -120,14 +122,10 @@ pub enum LDInstruction {
 }
 
 impl InstructionBehavior for LDInstruction {
-    fn execute(&self, machine: &mut Machine) {
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
         match self {
             LDInstruction::R8R8(register8, register9) => todo!(),
-            LDInstruction::R8N8(to, value) => machine
-                .cartridge
-                .cpu_bus_mut()
-                .registers_mut()
-                .set_r8(*to, *value),
+            LDInstruction::R8N8(to, value) => cpu.write().unwrap().registers.set_r8(*to, *value),
             LDInstruction::R16N16(register16, _) => todo!(),
             LDInstruction::SPN16(_) => todo!(),
             LDInstruction::N16SP(_) => todo!(),
@@ -180,27 +178,16 @@ pub enum LDHInstruction {
 }
 
 impl InstructionBehavior for LDHInstruction {
-    fn execute(&self, machine: &mut Machine) {
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
         match self {
             LDHInstruction::N8A(offset) => {
-                let value = machine.cartridge.cpu_bus().registers().af.a();
-                machine
-                    .cartridge
-                    .cpu_bus_mut()
-                    .write(0xFF00 + (*offset as u16), value);
+                let value = cpu.read().unwrap().registers.af.a();
+                cpu_bus.write(0xFF00 + (*offset as u16), value);
             }
             LDHInstruction::CA => todo!(),
             LDHInstruction::AN8(offset) => {
-                let value = machine
-                    .cartridge
-                    .cpu_bus_mut()
-                    .read(0xFF00 + (*offset as u16));
-                machine
-                    .cartridge
-                    .cpu_bus_mut()
-                    .registers_mut()
-                    .af
-                    .set_a(value);
+                let value = cpu_bus.read(0xFF00 + (*offset as u16));
+                cpu.write().unwrap().registers.af.set_a(value);
             }
             LDHInstruction::AC => todo!(),
         }
@@ -267,17 +254,18 @@ pub enum CPInstruction {
 }
 
 impl CPInstruction {
-    fn compare_with_a(&self, machine: &mut Machine, value: u8) {
-        let a_value = machine.cartridge.cpu_bus().registers().af.a();
-        let registers = machine.cartridge.cpu_bus_mut().registers_mut();
-        let new_f = registers
+    fn compare_with_a(&self, cpu: Arc<RwLock<CPU>>, value: u8) {
+        let mut cpu = cpu.write().unwrap();
+        let a_value = cpu.registers.af.a();
+        let new_f = cpu
+            .registers
             .af
             .f()
             .with_z(a_value == value)
             .with_n(true)
             .with_h(value & 0x0F > a_value & 0x0F)
             .with_c(value > a_value);
-        registers.af.set_f(new_f);
+        cpu.registers.af.set_f(new_f);
     }
 }
 
@@ -290,21 +278,19 @@ impl InstructionBehavior for CPInstruction {
         }
     }
 
-    fn execute(&self, machine: &mut Machine) {
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
         match self {
             CPInstruction::AR8(register8) => {
-                self.compare_with_a(
-                    machine,
-                    machine.cartridge.cpu_bus().registers().get_r8(*register8),
-                );
+                let value = cpu.read().unwrap().registers.get_r8(*register8);
+                self.compare_with_a(cpu, value);
             }
             CPInstruction::AHL => {
-                let addr = machine.cartridge.cpu_bus().registers().hl.into_bits();
-                let value = machine.cartridge.cpu_bus_mut().read(addr);
-                self.compare_with_a(machine, value)
+                let addr = cpu.read().unwrap().registers.hl.into_bits();
+                let value = cpu_bus.read(addr);
+                self.compare_with_a(cpu, value)
             }
             CPInstruction::AN8(value) => {
-                self.compare_with_a(machine, *value);
+                self.compare_with_a(cpu, *value);
             }
         }
     }
@@ -437,22 +423,22 @@ impl InstructionBehavior for XORInstruction {
         }
     }
 
-    fn execute(&self, machine: &mut Machine) {
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
         match self {
             XORInstruction::AR8(register8) => {
-                let registers = machine.cartridge.cpu_bus_mut().registers_mut();
+                let registers = &mut cpu.write().unwrap().registers;
                 registers
                     .af
                     .set_a(registers.af.a() ^ registers.get_r8(*register8));
             }
             XORInstruction::AHL => {
-                let bus = machine.cartridge.cpu_bus_mut();
-                let value = bus.read_readonly(bus.registers().hl.into_bits());
-                let registers = bus.registers_mut();
+                let bus = cpu_bus;
+                let value = bus.read_readonly(cpu.read().unwrap().registers.hl.into_bits());
+                let registers = &mut cpu.write().unwrap().registers;
                 registers.af.set_a(registers.af.a() ^ value)
             }
             XORInstruction::AN8(value) => {
-                let registers = machine.cartridge.cpu_bus_mut().registers_mut();
+                let registers = &mut cpu.write().unwrap().registers;
                 registers.af.set_a(registers.af.a() ^ value);
             }
         }
@@ -689,12 +675,12 @@ pub enum JPInstruction {
 }
 
 impl InstructionBehavior for JPInstruction {
-    fn execute(&self, machine: &mut Machine) {
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
         let target_addr = match self {
-            JPInstruction::HL => Some(machine.cartridge.cpu_bus().registers().hl.into_bits()),
+            JPInstruction::HL => Some(cpu.read().unwrap().registers.hl.into_bits()),
             JPInstruction::N16(addr) => Some(*addr),
             JPInstruction::CCN16(condition_code, addr) => {
-                if condition_code.matches(machine.cartridge.cpu_bus().registers()) {
+                if condition_code.matches(&cpu.read().unwrap().registers) {
                     Some(*addr)
                 } else {
                     None
@@ -703,7 +689,7 @@ impl InstructionBehavior for JPInstruction {
         };
 
         if let Some(target_addr) = target_addr {
-            machine.cartridge.cpu_bus_mut().registers_mut().pc = target_addr;
+            cpu.write().unwrap().registers.pc = target_addr;
         }
     }
 
@@ -723,14 +709,10 @@ pub enum JRInstruction {
 }
 
 impl JRInstruction {
-    fn jump_relative(&self, machine: &mut Machine, offset: i8) {
-        let new_address = machine
-            .cartridge
-            .cpu_bus()
-            .registers()
-            .pc
-            .saturating_add_signed(offset as i16);
-        machine.cartridge.cpu_bus_mut().registers_mut().pc = new_address;
+    fn jump_relative(&self, cpu: Arc<RwLock<CPU>>, offset: i8) {
+        let registers = &mut cpu.write().unwrap().registers;
+        let new_address = registers.pc.saturating_add_signed(offset as i16);
+        registers.pc = new_address;
     }
 }
 
@@ -742,12 +724,12 @@ impl InstructionBehavior for JRInstruction {
         }
     }
 
-    fn execute(&self, machine: &mut Machine) {
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
         match self {
-            JRInstruction::E8(offset) => self.jump_relative(machine, *offset),
+            JRInstruction::E8(offset) => self.jump_relative(cpu, *offset),
             JRInstruction::CCE8(condition_code, offset) => {
-                if condition_code.matches(machine.cartridge.cpu_bus().registers()) {
-                    self.jump_relative(machine, *offset);
+                if condition_code.matches(&cpu.read().unwrap().registers) {
+                    self.jump_relative(cpu, *offset);
                 }
             }
         }
@@ -775,9 +757,9 @@ pub enum RETIInstruction {
 }
 
 impl InstructionBehavior for RETIInstruction {
-    fn execute(&self, machine: &mut Machine) {
-        EIInstruction::Empty.execute(machine);
-        RETInstruction::Unconditional.execute(machine);
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+        EIInstruction::Empty.execute(cpu.clone(), cpu_bus);
+        RETInstruction::Unconditional.execute(cpu, cpu_bus);
     }
 
     fn duration(&self) -> usize {
@@ -802,8 +784,8 @@ pub enum CCFInstruction {
 }
 
 impl InstructionBehavior for CCFInstruction {
-    fn execute(&self, machine: &mut Machine) {
-        let f = &mut machine.cartridge.cpu_bus_mut().registers_mut().af.f();
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+        let f = &mut cpu.write().unwrap().registers.af.f();
         f.set_c(!f.c());
         f.set_n(false);
         f.set_h(false);
@@ -853,11 +835,8 @@ pub enum DIInstruction {
 }
 
 impl InstructionBehavior for DIInstruction {
-    fn execute(&self, machine: &mut Machine) {
-        machine
-            .cartridge
-            .cpu_bus_mut()
-            .set_interrupt_master_enable(false);
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+        cpu.write().unwrap().interrupt_master_enable = false;
     }
 
     fn duration(&self) -> usize {
@@ -871,11 +850,8 @@ pub enum EIInstruction {
 }
 
 impl InstructionBehavior for EIInstruction {
-    fn execute(&self, machine: &mut Machine) {
-        machine
-            .cartridge
-            .cpu_bus_mut()
-            .set_interrupt_master_enable(true);
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+        cpu.write().unwrap().interrupt_master_enable = true;
     }
 
     fn duration(&self) -> usize {
@@ -911,7 +887,7 @@ pub enum NOPInstruction {
 }
 
 impl InstructionBehavior for NOPInstruction {
-    fn execute(&self, machine: &mut Machine) {}
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {}
 
     fn duration(&self) -> usize {
         4

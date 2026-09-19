@@ -1,7 +1,10 @@
+use std::sync::{Arc, RwLock};
+
 use crate::{
     bus::{Bus, bus_interceptor::BusInterceptor},
-    cpu::registers::{
-        AFRegister, BCRegister, CPURegisters, DERegister, HLRegister, IERegister, IFRegister,
+    cpu::{
+        CPU,
+        registers::{IERegister, IFRegister},
     },
     ppu::{
         PPU,
@@ -9,39 +12,23 @@ use crate::{
     },
 };
 
-pub trait CPUBusTrait: Bus<u16> {
-    fn registers(&self) -> &CPURegisters;
-    fn registers_mut(&mut self) -> &mut CPURegisters;
-    fn get_interrupt_master_enable(&self) -> bool;
-    fn set_interrupt_master_enable(&mut self, value: bool);
-}
+pub trait CPUBusTrait: Bus<u16> {}
 
 pub struct CPUBus {
     work_ram: Vec<u8>,
     high_ram: [u8; 127],
-    pub registers: CPURegisters,
-    pub interrupt_master_enable: bool,
-    pub ppu: PPU,
+    pub cpu: Arc<RwLock<CPU>>,
+    pub ppu: Arc<RwLock<PPU>>,
 }
 
 impl CPUBus {
-    pub fn new() -> CPUBus {
+    pub fn new(cpu: Arc<RwLock<CPU>>, ppu: Arc<RwLock<PPU>>) -> CPUBus {
         CPUBus {
             // TODO: support CGB bank switching
             work_ram: Vec::with_capacity(2048),
             high_ram: [0; _],
-            registers: CPURegisters {
-                af: AFRegister::from_bits(0),
-                bc: BCRegister::from_bits(0),
-                de: DERegister::from_bits(0),
-                hl: HLRegister::from_bits(0),
-                sp: 0,
-                pc: 0x0100,
-                interrupt_enable: IERegister::from_bits(0),
-                interrupt_flag: IFRegister::from_bits(0),
-            },
-            interrupt_master_enable: false,
-            ppu: PPU::new(),
+            cpu,
+            ppu,
         }
     }
 }
@@ -56,15 +43,29 @@ impl Bus<u16> for CPUBus {
             0xE000..=0xFDFF => self.try_read_readonly(addr - 0x2000),
             0xFE00..=0xFE9F => todo!("OAM"),
             0xFEA0..=0xFEFF => todo!("Not usable"),
-            0xFF0F => Some(self.registers.interrupt_flag.into_bits()),
-            0xFF40 => Some(self.ppu.lcd_control.into_bits()),
-            0xFF41 => Some(self.ppu.lcd_status.into_bits()),
-            0xFF42 => Some(self.ppu.bg_viewport_y),
-            0xFF43 => Some(self.ppu.bg_viewport_x),
-            0xFF44 => Some(self.ppu.ly),
+            0xFF0F => Some(
+                self.cpu
+                    .read()
+                    .unwrap()
+                    .registers
+                    .interrupt_flag
+                    .into_bits(),
+            ),
+            0xFF40 => Some(self.ppu.read().unwrap().lcd_control.into_bits()),
+            0xFF41 => Some(self.ppu.read().unwrap().lcd_status.into_bits()),
+            0xFF42 => Some(self.ppu.read().unwrap().bg_viewport_y),
+            0xFF43 => Some(self.ppu.read().unwrap().bg_viewport_x),
+            0xFF44 => Some(self.ppu.read().unwrap().ly),
             0xFF00..=0xFF7F => todo!("I/O register {:04X}", addr),
             0xFF80..=0xFFFE => Some(self.high_ram[(addr - 0xFF80) as usize]),
-            0xFFFF => Some(self.registers.interrupt_enable.into_bits()),
+            0xFFFF => Some(
+                self.cpu
+                    .read()
+                    .unwrap()
+                    .registers
+                    .interrupt_enable
+                    .into_bits(),
+            ),
         }
     }
 
@@ -77,65 +78,37 @@ impl Bus<u16> for CPUBus {
             0xE000..=0xFDFF => self.write(addr - 0x2000, value),
             0xFE00..=0xFE9F => todo!("OAM"),
             0xFEA0..=0xFEFF => todo!("Not usable"),
-            0xFF0F => self.registers.interrupt_flag = IFRegister::from_bits(value),
-            0xFF40 => self.ppu.lcd_control = LCDControlRegister::from_bits(value),
+            0xFF0F => {
+                self.cpu.write().unwrap().registers.interrupt_flag = IFRegister::from_bits(value)
+            }
+            0xFF40 => self.ppu.write().unwrap().lcd_control = LCDControlRegister::from_bits(value),
             0xFF41 => {
-                self.ppu.lcd_status = self
+                let new_value = self
                     .ppu
+                    .read()
+                    .unwrap()
                     .lcd_status
-                    .write_from_bus(LCDStatusRegister::from_bits(value))
+                    .write_from_bus(LCDStatusRegister::from_bits(value));
+                self.ppu.write().unwrap().lcd_status = new_value;
             }
             0xFF42 => {
                 // TODO: Delayed writes https://gbdev.io/pandocs/Scrolling.html#viewport-position-scrolling
-                self.ppu.bg_viewport_y = value;
+                self.ppu.write().unwrap().bg_viewport_y = value;
             }
             0xFF43 => {
                 // TODO: Delayed writes https://gbdev.io/pandocs/Scrolling.html#viewport-position-scrolling
-                self.ppu.bg_viewport_x = value;
+                self.ppu.write().unwrap().bg_viewport_x = value;
             }
             0xFF44 => {}
             0xFF00..=0xFF7F => todo!("I/O register {:04X}", addr),
             0xFF80..=0xFFFE => self.high_ram[(addr - 0xFF80) as usize] = value,
-            0xFFFF => self.registers.interrupt_enable = IERegister::from_bits(value),
+            0xFFFF => {
+                self.cpu.write().unwrap().registers.interrupt_enable = IERegister::from_bits(value)
+            }
         }
     }
 }
 
-impl CPUBusTrait for CPUBus {
-    fn registers(&self) -> &CPURegisters {
-        &self.registers
-    }
+impl CPUBusTrait for CPUBus {}
 
-    fn registers_mut(&mut self) -> &mut CPURegisters {
-        &mut self.registers
-    }
-
-    fn get_interrupt_master_enable(&self) -> bool {
-        self.interrupt_master_enable
-    }
-
-    fn set_interrupt_master_enable(&mut self, value: bool) {
-        self.interrupt_master_enable = value;
-    }
-}
-
-impl<T> CPUBusTrait for T
-where
-    T: BusInterceptor<u16, BusType = CPUBus>,
-{
-    fn registers(&self) -> &CPURegisters {
-        self.get_inner().registers()
-    }
-
-    fn registers_mut(&mut self) -> &mut CPURegisters {
-        self.get_inner_mut().registers_mut()
-    }
-
-    fn get_interrupt_master_enable(&self) -> bool {
-        self.get_inner().get_interrupt_master_enable()
-    }
-
-    fn set_interrupt_master_enable(&mut self, value: bool) {
-        self.get_inner_mut().set_interrupt_master_enable(value)
-    }
-}
+impl<T> CPUBusTrait for T where T: BusInterceptor<u16, BusType = CPUBus> {}

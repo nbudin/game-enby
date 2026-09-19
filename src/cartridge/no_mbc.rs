@@ -1,7 +1,13 @@
+use std::sync::{Arc, RwLock};
+
 use crate::{
     bus::bus_interceptor::{BusInterceptor, InterceptorResult},
     cartridge::CartridgeBehavior,
-    cpu::cpu_bus::{CPUBus, CPUBusTrait},
+    cpu::{
+        CPU,
+        cpu_bus::{CPUBus, CPUBusTrait},
+    },
+    ppu::PPU,
 };
 
 pub struct NoMBCCPUBusInterceptor {
@@ -28,7 +34,7 @@ impl BusInterceptor<u16> for NoMBCCPUBusInterceptor {
         }
     }
 
-    fn intercept_write(&mut self, addr: u16, value: u8) -> InterceptorResult<()> {
+    fn intercept_write(&mut self, _addr: u16, _value: u8) -> InterceptorResult<()> {
         InterceptorResult::NotIntercepted
     }
 }
@@ -38,11 +44,11 @@ pub struct NoMBC {
 }
 
 impl NoMBC {
-    pub fn from_rom(rom: Vec<u8>) -> Self {
+    pub fn from_rom(rom: Vec<u8>, cpu: Arc<RwLock<CPU>>, ppu: Arc<RwLock<PPU>>) -> Self {
         NoMBC {
             cpu_bus: NoMBCCPUBusInterceptor {
                 rom,
-                bus: CPUBus::new(),
+                bus: CPUBus::new(cpu, ppu),
             },
         }
     }

@@ -2,7 +2,8 @@ use std::{
     env,
     fmt::Display,
     fs::File,
-    io::{Read, Write},
+    io::Read,
+    sync::{Arc, RwLock},
 };
 
 use crate::{
@@ -13,6 +14,7 @@ use crate::{
         instructions::InstructionBehavior,
         registers::{BCRegister, CPUFlags, DERegister, HLRegister},
     },
+    ppu::PPU,
 };
 
 mod bus;
@@ -53,34 +55,38 @@ impl Display for TraceState {
 }
 
 pub struct Machine {
-    cpu: CPU,
+    cpu: Arc<RwLock<CPU>>,
+    ppu: Arc<RwLock<PPU>>,
     cartridge: Cartridge,
 }
 
 impl Machine {
     pub fn from_rom(rom: Vec<u8>) -> Machine {
+        let cpu = Arc::new(RwLock::new(CPU::new()));
+        let ppu = Arc::new(RwLock::new(PPU::new()));
         Machine {
-            cpu: CPU::new(),
-            cartridge: Cartridge::from_rom(rom),
+            cpu: cpu.clone(),
+            ppu: ppu.clone(),
+            cartridge: Cartridge::from_rom(rom, cpu, ppu),
         }
     }
 
     pub fn trace_state(&self) -> TraceState {
         let bus = self.cartridge.cpu_bus();
         let pcmem = [
-            bus.read_readonly(bus.registers().pc),
-            bus.read_readonly(bus.registers().pc + 1),
-            bus.read_readonly(bus.registers().pc + 2),
-            bus.read_readonly(bus.registers().pc + 3),
+            bus.read_readonly(self.cpu.read().unwrap().registers.pc),
+            bus.read_readonly(self.cpu.read().unwrap().registers.pc + 1),
+            bus.read_readonly(self.cpu.read().unwrap().registers.pc + 2),
+            bus.read_readonly(self.cpu.read().unwrap().registers.pc + 3),
         ];
         TraceState {
-            a: bus.registers().af.a(),
-            f: bus.registers().af.f(),
-            bc: bus.registers().bc,
-            de: bus.registers().de,
-            hl: bus.registers().hl,
-            sp: bus.registers().sp,
-            pc: bus.registers().pc,
+            a: self.cpu.read().unwrap().registers.af.a(),
+            f: self.cpu.read().unwrap().registers.af.f(),
+            bc: self.cpu.read().unwrap().registers.bc,
+            de: self.cpu.read().unwrap().registers.de,
+            hl: self.cpu.read().unwrap().registers.hl,
+            sp: self.cpu.read().unwrap().registers.sp,
+            pc: self.cpu.read().unwrap().registers.pc,
             pcmem,
         }
     }
@@ -89,9 +95,9 @@ impl Machine {
 impl Read for Machine {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         for i in 0..buf.len() {
-            let pc = self.cartridge.cpu_bus().registers().pc;
+            let pc = self.cpu.read().unwrap().registers.pc;
             buf[i] = self.cartridge.cpu_bus_mut().read(pc);
-            self.cartridge.cpu_bus_mut().registers_mut().pc += 1;
+            self.cpu.write().unwrap().registers.pc += 1;
         }
 
         Ok(buf.len())
@@ -108,7 +114,7 @@ fn main() {
 
     for _i in 1..1000 {
         let instruction = read_instruction(&mut machine).unwrap();
-        println!("{:20} {}", format!("{instruction}"), machine.trace_state());
-        instruction.execute(&mut machine);
+        eprintln!("{:20} {}", format!("{instruction}"), machine.trace_state());
+        instruction.execute(machine.cpu.clone(), machine.cartridge.cpu_bus_mut());
     }
 }

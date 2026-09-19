@@ -1,9 +1,6 @@
 use strum::AsRefStr;
 
-use crate::cpu::{
-    CPU,
-    registers::{CPURegisters, Register8, Register16},
-};
+use crate::cpu::registers::{CPURegisters, Register8, Register16};
 
 #[derive(Debug, AsRefStr)]
 pub enum ConditionCode {
