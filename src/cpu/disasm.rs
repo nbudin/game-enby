@@ -5,6 +5,7 @@ use zendian::le::u16le;
 
 use crate::cpu::{
     instructions::*,
+    operand::ConditionCode,
     registers::{Register8, Register16},
 };
 
@@ -12,6 +13,11 @@ fn read_u8(src: &mut impl Read) -> Result<u8, std::io::Error> {
     let mut buf = [0u8];
     src.read_exact(&mut buf)?;
     Ok(buf[0])
+}
+
+fn read_i8(src: &mut impl Read) -> Result<i8, std::io::Error> {
+    let byte = read_u8(src)?;
+    Ok(byte as i8)
 }
 
 fn read_u16le(src: &mut impl Read) -> Result<u16, std::io::Error> {
@@ -53,6 +59,8 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
         0x16 => LDInstruction::R8N8(Register8::D, read_u8(src)?).into(),
         0x17 => RLAInstruction::Empty.into(),
 
+        0x20 => JRInstruction::CCE8(ConditionCode::NZ, read_i8(src)?).into(),
+
         0x3E => LDInstruction::R8N8(Register8::A, read_u8(src)?).into(),
 
         0xAF => XORInstruction::AR8(Register8::A).into(),
@@ -61,7 +69,9 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
 
         0xE0 => LDHInstruction::N8A(read_u8(src)?).into(),
 
+        0xF0 => LDHInstruction::AN8(read_u8(src)?).into(),
         0xF3 => CCFInstruction::Empty.into(),
+        0xFE => CPInstruction::AN8(read_u8(src)?).into(),
 
         _ => todo!("Unknown opcode: {:02X}", opcode),
     })

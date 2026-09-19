@@ -48,7 +48,7 @@ fn main() {
 
     let mut machine = Machine::from_rom(rom_data);
 
-    for _i in 1..20 {
+    for _i in 1..1000 {
         let instruction = read_instruction(&mut machine).unwrap();
         println!("{:?}", instruction);
         instruction.execute(&mut machine);

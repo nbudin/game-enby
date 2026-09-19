@@ -190,7 +190,18 @@ impl InstructionBehavior for LDHInstruction {
                     .write(0xFF00 + (*offset as u16), value);
             }
             LDHInstruction::CA => todo!(),
-            LDHInstruction::AN8(_) => todo!(),
+            LDHInstruction::AN8(offset) => {
+                let value = machine
+                    .cartridge
+                    .cpu_bus_mut()
+                    .read(0xFF00 + (*offset as u16));
+                machine
+                    .cartridge
+                    .cpu_bus_mut()
+                    .registers_mut()
+                    .af
+                    .set_a(value);
+            }
             LDHInstruction::AC => todo!(),
         }
     }
@@ -255,12 +266,46 @@ pub enum CPInstruction {
     AN8(u8),
 }
 
+impl CPInstruction {
+    fn compare_with_a(&self, machine: &mut Machine, value: u8) {
+        let a_value = machine.cartridge.cpu_bus().registers().af.a();
+        let registers = machine.cartridge.cpu_bus_mut().registers_mut();
+        let new_f = registers
+            .af
+            .f()
+            .with_z(a_value == value)
+            .with_n(true)
+            .with_h(value & 0x0F > a_value & 0x0F)
+            .with_c(value > a_value);
+        registers.af.set_f(new_f);
+    }
+}
+
 impl InstructionBehavior for CPInstruction {
     fn duration(&self) -> usize {
         match self {
             CPInstruction::AR8(_) => 4,
             CPInstruction::AHL => 8,
             CPInstruction::AN8(_) => 8,
+        }
+    }
+
+    fn execute(&self, machine: &mut Machine) {
+        match self {
+            CPInstruction::AR8(register8) => {
+                self.compare_with_a(
+                    machine,
+                    machine.cartridge.cpu_bus().registers().get_r8(*register8),
+                );
+            }
+            CPInstruction::AHL => {
+                let addr = machine.cartridge.cpu_bus().registers().hl.into_bits();
+                let value = machine.cartridge.cpu_bus_mut().read(addr);
+                self.compare_with_a(machine, value)
+            }
+            CPInstruction::AN8(value) => {
+                self.compare_with_a(machine, *value);
+            }
         }
     }
 }
@@ -677,11 +722,34 @@ pub enum JRInstruction {
     CCE8(ConditionCode, i8),
 }
 
+impl JRInstruction {
+    fn jump_relative(&self, machine: &mut Machine, offset: i8) {
+        let new_address = machine
+            .cartridge
+            .cpu_bus()
+            .registers()
+            .pc
+            .saturating_add_signed(offset as i16);
+        machine.cartridge.cpu_bus_mut().registers_mut().pc = new_address;
+    }
+}
+
 impl InstructionBehavior for JRInstruction {
     fn duration(&self) -> usize {
         match self {
             JRInstruction::E8(_) => 12,
             JRInstruction::CCE8(_, _) => 8,
+        }
+    }
+
+    fn execute(&self, machine: &mut Machine) {
+        match self {
+            JRInstruction::E8(offset) => self.jump_relative(machine, *offset),
+            JRInstruction::CCE8(condition_code, offset) => {
+                if condition_code.matches(machine.cartridge.cpu_bus().registers()) {
+                    self.jump_relative(machine, *offset);
+                }
+            }
         }
     }
 }
