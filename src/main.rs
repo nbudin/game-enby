@@ -12,6 +12,7 @@ use crate::{
 mod bus;
 mod cartridge;
 mod cpu;
+mod ppu;
 
 pub struct Machine {
     cpu: CPU,
@@ -47,7 +48,7 @@ fn main() {
 
     let mut machine = Machine::from_rom(rom_data);
 
-    for _i in 1..10 {
+    for _i in 1..20 {
         let instruction = read_instruction(&mut machine).unwrap();
         println!("{:?}", instruction);
         instruction.execute(&mut machine);

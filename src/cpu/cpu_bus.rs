@@ -3,6 +3,7 @@ use crate::{
     cpu::registers::{
         AFRegister, BCRegister, CPURegisters, DERegister, HLRegister, IERegister, IFRegister,
     },
+    ppu::{PPU, registers::LCDStatusRegister},
 };
 
 pub trait CPUBusTrait: Bus<u16> {
@@ -16,6 +17,7 @@ pub struct CPUBus {
     work_ram: Vec<u8>,
     pub registers: CPURegisters,
     pub interrupt_master_enable: bool,
+    pub ppu: PPU,
 }
 
 impl CPUBus {
@@ -34,6 +36,9 @@ impl CPUBus {
                 interrupt_flag: IFRegister::from_bits(0),
             },
             interrupt_master_enable: false,
+            ppu: PPU {
+                lcd_status: LCDStatusRegister::new(),
+            },
         }
     }
 }
@@ -48,9 +53,9 @@ impl Bus<u16> for CPUBus {
             0xE000..=0xFDFF => self.try_read_readonly(addr - 0x2000),
             0xFE00..=0xFE9F => todo!("OAM"),
             0xFEA0..=0xFEFF => todo!("Not usable"),
-            0xFF00..=0xFF0E => todo!("I/O register {:04X}", addr),
             0xFF0F => Some(self.registers.interrupt_flag.into_bits()),
-            0xFF10..=0xFF7F => todo!("I/O register {:04X}", addr),
+            0xFF41 => Some(self.ppu.lcd_status.into_bits()),
+            0xFF00..=0xFF7F => todo!("I/O register {:04X}", addr),
             0xFF80..=0xFFFE => todo!("High RAM"),
             0xFFFF => Some(self.registers.interrupt_enable.into_bits()),
         }
@@ -65,9 +70,14 @@ impl Bus<u16> for CPUBus {
             0xE000..=0xFDFF => self.write(addr - 0x2000, value),
             0xFE00..=0xFE9F => todo!("OAM"),
             0xFEA0..=0xFEFF => todo!("Not usable"),
-            0xFF00..=0xFF0E => todo!("I/O register {:04X}", addr),
             0xFF0F => self.registers.interrupt_flag = IFRegister::from_bits(value),
-            0xFF10..=0xFF7F => todo!("I/O register {:04X}", addr),
+            0xFF41 => {
+                self.ppu.lcd_status = self
+                    .ppu
+                    .lcd_status
+                    .write_from_bus(LCDStatusRegister::from_bits(value))
+            }
+            0xFF00..=0xFF7F => todo!("I/O register {:04X}", addr),
             0xFF80..=0xFFFE => todo!("High RAM"),
             0xFFFF => self.registers.interrupt_enable = IERegister::from_bits(value),
         }

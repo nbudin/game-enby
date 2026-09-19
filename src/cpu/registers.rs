@@ -73,6 +73,18 @@ pub struct CPURegisters {
 }
 
 impl CPURegisters {
+    pub fn get_r8(&self, r8: Register8) -> u8 {
+        match r8 {
+            Register8::A => self.af.a(),
+            Register8::B => self.bc.b(),
+            Register8::C => self.bc.c(),
+            Register8::D => self.de.d(),
+            Register8::E => self.de.e(),
+            Register8::H => self.hl.h(),
+            Register8::L => self.hl.l(),
+        }
+    }
+
     pub fn set_r8(&mut self, r8: Register8, value: u8) {
         match r8 {
             Register8::A => self.af.set_a(value),

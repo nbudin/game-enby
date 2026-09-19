@@ -55,6 +55,8 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
 
         0x3E => LDInstruction::R8N8(Register8::A, read_u8(src)?).into(),
 
+        0xAF => XORInstruction::AR8(Register8::A).into(),
+
         0xC3 => JPInstruction::N16(read_u16le(src)?).into(),
 
         0xE0 => LDHInstruction::N8A(read_u8(src)?).into(),

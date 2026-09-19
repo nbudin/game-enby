@@ -391,6 +391,27 @@ impl InstructionBehavior for XORInstruction {
             XORInstruction::AN8(_) => 8,
         }
     }
+
+    fn execute(&self, machine: &mut Machine) {
+        match self {
+            XORInstruction::AR8(register8) => {
+                let registers = machine.cartridge.cpu_bus_mut().registers_mut();
+                registers
+                    .af
+                    .set_a(registers.af.a() ^ registers.get_r8(*register8));
+            }
+            XORInstruction::AHL => {
+                let bus = machine.cartridge.cpu_bus_mut();
+                let value = bus.read_readonly(bus.registers().hl.into_bits());
+                let registers = bus.registers_mut();
+                registers.af.set_a(registers.af.a() ^ value)
+            }
+            XORInstruction::AN8(value) => {
+                let registers = machine.cartridge.cpu_bus_mut().registers_mut();
+                registers.af.set_a(registers.af.a() ^ value);
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
