@@ -1,6 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use crate::{
+    apu::APU,
     bus::bus_interceptor::{BusInterceptor, InterceptorResult},
     cartridge::CartridgeBehavior,
     cpu::{
@@ -44,11 +45,16 @@ pub struct NoMBC {
 }
 
 impl NoMBC {
-    pub fn from_rom(rom: Vec<u8>, cpu: Arc<RwLock<CPU>>, ppu: Arc<RwLock<PPU>>) -> Self {
+    pub fn from_rom(
+        rom: Vec<u8>,
+        apu: Arc<RwLock<APU>>,
+        cpu: Arc<RwLock<CPU>>,
+        ppu: Arc<RwLock<PPU>>,
+    ) -> Self {
         NoMBC {
             cpu_bus: NoMBCCPUBusInterceptor {
                 rom,
-                bus: CPUBus::new(cpu, ppu),
+                bus: CPUBus::new(apu, cpu, ppu),
             },
         }
     }

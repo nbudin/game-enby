@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::{
+    apu::APU,
     cartridge::{Cartridge, CartridgeBehavior},
     cpu::{
         CPU,
@@ -17,6 +18,7 @@ use crate::{
     ppu::PPU,
 };
 
+mod apu;
 mod bus;
 mod cartridge;
 mod cpu;
@@ -55,19 +57,25 @@ impl Display for TraceState {
 }
 
 pub struct Machine {
+    apu: Arc<RwLock<APU>>,
     cpu: Arc<RwLock<CPU>>,
     ppu: Arc<RwLock<PPU>>,
     cartridge: Cartridge,
+    cpu_wait_cycles: usize,
 }
 
 impl Machine {
     pub fn from_rom(rom: Vec<u8>) -> Machine {
+        let apu = Arc::new(RwLock::new(APU::new()));
         let cpu = Arc::new(RwLock::new(CPU::new()));
         let ppu = Arc::new(RwLock::new(PPU::new()));
+
         Machine {
+            apu: apu.clone(),
             cpu: cpu.clone(),
             ppu: ppu.clone(),
-            cartridge: Cartridge::from_rom(rom, cpu, ppu),
+            cartridge: Cartridge::from_rom(rom, apu, cpu, ppu),
+            cpu_wait_cycles: 0,
         }
     }
 
@@ -89,6 +97,19 @@ impl Machine {
             pc: self.cpu.read().unwrap().registers.pc,
             pcmem,
         }
+    }
+
+    pub fn tick(&mut self) {
+        if self.cpu_wait_cycles == 0 {
+            let instruction = read_instruction(self).unwrap();
+            eprintln!("{:20} {}", format!("{instruction}"), self.trace_state());
+            instruction.execute(self.cpu.clone(), self.cartridge.cpu_bus_mut());
+            self.cpu_wait_cycles = instruction.duration() - 1;
+        } else {
+            self.cpu_wait_cycles -= 1;
+        }
+
+        self.ppu.write().unwrap().tick();
     }
 }
 
@@ -112,9 +133,7 @@ fn main() {
 
     let mut machine = Machine::from_rom(rom_data);
 
-    for _i in 1..1000 {
-        let instruction = read_instruction(&mut machine).unwrap();
-        eprintln!("{:20} {}", format!("{instruction}"), machine.trace_state());
-        instruction.execute(machine.cpu.clone(), machine.cartridge.cpu_bus_mut());
+    for _i in 1..100000 {
+        machine.tick();
     }
 }

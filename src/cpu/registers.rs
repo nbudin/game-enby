@@ -97,6 +97,22 @@ impl CPURegisters {
             Register8::L => self.hl.set_l(value),
         }
     }
+
+    pub fn get_r16(&self, r16: Register16) -> u16 {
+        match r16 {
+            Register16::BC => self.bc.into_bits(),
+            Register16::DE => self.de.into_bits(),
+            Register16::HL => self.hl.into_bits(),
+        }
+    }
+
+    pub fn set_r16(&mut self, r16: Register16, value: u16) {
+        match r16 {
+            Register16::BC => self.bc = BCRegister::from_bits(value),
+            Register16::DE => self.de = DERegister::from_bits(value),
+            Register16::HL => self.hl = HLRegister::from_bits(value),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, AsRefStr)]
@@ -110,7 +126,7 @@ pub enum Register8 {
     L,
 }
 
-#[derive(Debug, AsRefStr)]
+#[derive(Debug, AsRefStr, Clone, Copy)]
 pub enum Register16 {
     BC,
     DE,

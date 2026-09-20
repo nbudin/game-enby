@@ -12,7 +12,7 @@ use crate::cpu::{
     asm::Assemble,
     cpu_bus::CPUBusTrait,
     operand::ConditionCode,
-    registers::{Register8, Register16},
+    registers::{CPUFlags, HLRegister, Register8, Register16},
 };
 
 #[derive(Debug, FromRepr, Copy, Clone)]
@@ -124,20 +124,45 @@ pub enum LDInstruction {
 impl InstructionBehavior for LDInstruction {
     fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
         match self {
-            LDInstruction::R8R8(register8, register9) => todo!(),
+            LDInstruction::R8R8(to, from) => {
+                let registers = &mut cpu.write().unwrap().registers;
+                let value = registers.get_r8(*from);
+                registers.set_r8(*to, value);
+            }
             LDInstruction::R8N8(to, value) => cpu.write().unwrap().registers.set_r8(*to, *value),
-            LDInstruction::R16N16(register16, _) => todo!(),
-            LDInstruction::SPN16(_) => todo!(),
+            LDInstruction::R16N16(to, value) => cpu.write().unwrap().registers.set_r16(*to, *value),
+            LDInstruction::SPN16(value) => cpu.write().unwrap().registers.sp = *value,
             LDInstruction::N16SP(_) => todo!(),
-            LDInstruction::HLR8(register8) => todo!(),
-            LDInstruction::HLN8(_) => todo!(),
-            LDInstruction::R8HL(register8) => todo!(),
+            LDInstruction::HLR8(from) => {
+                let to = cpu.read().unwrap().registers.hl.into_bits();
+                let value = cpu.read().unwrap().registers.get_r8(*from);
+                cpu_bus.write(to, value);
+            }
+            LDInstruction::HLN8(value) => {
+                let to = cpu.read().unwrap().registers.hl.into_bits();
+                cpu_bus.write(to, *value);
+            }
+            LDInstruction::R8HL(to) => {
+                let addr = cpu.read().unwrap().registers.hl.into_bits();
+                let value = cpu_bus.read(addr);
+                cpu.write().unwrap().registers.set_r8(*to, value);
+            }
             LDInstruction::R16A(register16) => todo!(),
             LDInstruction::N16A(_) => todo!(),
             LDInstruction::AR16(register16) => todo!(),
             LDInstruction::AN16(_) => todo!(),
-            LDInstruction::HLIA => todo!(),
-            LDInstruction::HLDA => todo!(),
+            LDInstruction::HLIA => {
+                let to = cpu.read().unwrap().registers.hl.into_bits();
+                let value = cpu.read().unwrap().registers.af.a();
+                cpu_bus.write(to, value);
+                cpu.write().unwrap().registers.hl = HLRegister::from_bits(to + 1);
+            }
+            LDInstruction::HLDA => {
+                let to = cpu.read().unwrap().registers.hl.into_bits();
+                let value = cpu.read().unwrap().registers.af.a();
+                cpu_bus.write(to, value);
+                cpu.write().unwrap().registers.hl = HLRegister::from_bits(to - 1);
+            }
             LDInstruction::AHLI => todo!(),
             LDInstruction::AHLD => todo!(),
             LDInstruction::HLSPE8(_) => todo!(),
@@ -304,6 +329,14 @@ pub enum DECInstruction {
     SP,
 }
 
+impl DECInstruction {
+    fn set_flags_after_dec(&self, flags: &mut CPUFlags, new_value: u8) {
+        flags.set_z(new_value == 0);
+        flags.set_n(true);
+        flags.set_h(new_value & 0x0F == 0x0F);
+    }
+}
+
 impl InstructionBehavior for DECInstruction {
     fn duration(&self) -> usize {
         match self {
@@ -311,6 +344,34 @@ impl InstructionBehavior for DECInstruction {
             DECInstruction::HL => 12,
             DECInstruction::R16(_) => 8,
             DECInstruction::SP => 8,
+        }
+    }
+
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+        match self {
+            DECInstruction::R8(register8) => {
+                let registers = &mut cpu.write().unwrap().registers;
+                let value = registers.get_r8(*register8);
+                let new_value = value.wrapping_sub(1);
+                registers.set_r8(*register8, new_value);
+                self.set_flags_after_dec(&mut registers.af.f(), new_value);
+            }
+            DECInstruction::HL => {
+                let addr = cpu.read().unwrap().registers.hl.into_bits();
+                let value = cpu_bus.read(addr);
+                let new_value = value.wrapping_sub(1);
+                cpu_bus.write(addr, new_value);
+                self.set_flags_after_dec(&mut cpu.write().unwrap().registers.af.f(), new_value);
+            }
+            DECInstruction::R16(register16) => {
+                let registers = &mut cpu.write().unwrap().registers;
+                let value = registers.get_r16(*register16);
+                registers.set_r16(*register16, value.wrapping_sub(1));
+            }
+            DECInstruction::SP => {
+                let registers = &mut cpu.write().unwrap().registers;
+                registers.sp = registers.sp.wrapping_sub(1);
+            }
         }
     }
 }
@@ -323,6 +384,14 @@ pub enum INCInstruction {
     SP,
 }
 
+impl INCInstruction {
+    fn set_flags_after_inc(&self, flags: &mut CPUFlags, new_value: u8) {
+        flags.set_z(new_value == 0);
+        flags.set_n(false);
+        flags.set_h(new_value & 0x0F == 0);
+    }
+}
+
 impl InstructionBehavior for INCInstruction {
     fn duration(&self) -> usize {
         match self {
@@ -330,6 +399,34 @@ impl InstructionBehavior for INCInstruction {
             INCInstruction::HL => 12,
             INCInstruction::R16(_) => 8,
             INCInstruction::SP => 8,
+        }
+    }
+
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+        match self {
+            INCInstruction::R8(register8) => {
+                let registers = &mut cpu.write().unwrap().registers;
+                let value = registers.get_r8(*register8);
+                let new_value = value.wrapping_add(1);
+                registers.set_r8(*register8, new_value);
+                self.set_flags_after_inc(&mut registers.af.f(), new_value);
+            }
+            INCInstruction::HL => {
+                let addr = cpu.read().unwrap().registers.hl.into_bits();
+                let value = cpu_bus.read(addr);
+                let new_value = value.wrapping_add(1);
+                cpu_bus.write(addr, new_value);
+                self.set_flags_after_inc(&mut cpu.write().unwrap().registers.af.f(), new_value);
+            }
+            INCInstruction::R16(register16) => {
+                let registers = &mut cpu.write().unwrap().registers;
+                let value = registers.get_r16(*register16);
+                registers.set_r16(*register16, value.wrapping_add(1));
+            }
+            INCInstruction::SP => {
+                let registers = &mut cpu.write().unwrap().registers;
+                registers.sp = registers.sp.wrapping_add(1);
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 use enum_dispatch::enum_dispatch;
 
 use crate::{
+    apu::APU,
     cartridge::no_mbc::NoMBC,
     cpu::{CPU, cpu_bus::CPUBusTrait},
     ppu::PPU,
@@ -22,7 +23,12 @@ pub enum Cartridge {
 }
 
 impl Cartridge {
-    pub fn from_rom(rom: Vec<u8>, cpu: Arc<RwLock<CPU>>, ppu: Arc<RwLock<PPU>>) -> Self {
-        NoMBC::from_rom(rom, cpu, ppu).into()
+    pub fn from_rom(
+        rom: Vec<u8>,
+        apu: Arc<RwLock<APU>>,
+        cpu: Arc<RwLock<CPU>>,
+        ppu: Arc<RwLock<PPU>>,
+    ) -> Self {
+        NoMBC::from_rom(rom, apu, cpu, ppu).into()
     }
 }

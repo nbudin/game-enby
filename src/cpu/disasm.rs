@@ -63,7 +63,11 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
         0x17 => RLAInstruction::Empty.into(),
 
         0x20 => JRInstruction::CCE8(ConditionCode::NZ, read_i8(src)?).into(),
+        0x21 => LDInstruction::R16N16(Register16::HL, read_u16le(src)?).into(),
 
+        0x31 => LDInstruction::SPN16(read_u16le(src)?).into(),
+        0x32 => LDInstruction::HLDA.into(),
+        0x36 => LDInstruction::HLN8(read_u8(src)?).into(),
         0x3E => LDInstruction::R8N8(Register8::A, read_u8(src)?).into(),
 
         0xAF => XORInstruction::AR8(Register8::A).into(),
@@ -85,6 +89,7 @@ impl Display for Instruction {
         match self {
             Instruction::CCFInstruction(_) => f.write_str("CCF"),
             Instruction::CPInstruction(instruction) => Display::fmt(&instruction, f),
+            Instruction::DECInstruction(instruction) => Display::fmt(&instruction, f),
             Instruction::LDInstruction(instruction) => Display::fmt(&instruction, f),
             Instruction::LDHInstruction(instruction) => Display::fmt(&instruction, f),
             Instruction::JPInstruction(instruction) => Display::fmt(&instruction, f),
@@ -108,6 +113,21 @@ impl Display for CPInstruction {
     }
 }
 
+impl Display for DECInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DECInstruction::R8(register8) => {
+                f.write_fmt(format_args!("DEC {}", register8.as_ref()))
+            }
+            DECInstruction::HL => f.write_str("DEC HL"),
+            DECInstruction::R16(register16) => {
+                f.write_fmt(format_args!("DEC {}", register16.as_ref()))
+            }
+            DECInstruction::SP => f.write_str("DEC SP"),
+        }
+    }
+}
+
 impl Display for JRInstruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -122,24 +142,26 @@ impl Display for JRInstruction {
 impl Display for LDInstruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LDInstruction::R8R8(destination, source) => todo!(),
-            LDInstruction::R8N8(destination, value) => {
-                f.write_fmt(format_args!("LD {}, 0x{:02X}", destination.as_ref(), value))
+            LDInstruction::R8R8(to, from) => todo!(),
+            LDInstruction::R8N8(to, value) => {
+                f.write_fmt(format_args!("LD {}, 0x{:02X}", to.as_ref(), value))
             }
-            LDInstruction::R16N16(register16, _) => todo!(),
-            LDInstruction::SPN16(_) => todo!(),
-            LDInstruction::N16SP(_) => todo!(),
-            LDInstruction::HLR8(register8) => todo!(),
-            LDInstruction::HLN8(_) => todo!(),
-            LDInstruction::R8HL(register8) => todo!(),
+            LDInstruction::R16N16(to, value) => {
+                f.write_fmt(format_args!("LD {}, 0x{:04X}", to.as_ref(), value))
+            }
+            LDInstruction::SPN16(value) => f.write_fmt(format_args!("LD SP, 0x{:04X}", value)),
+            LDInstruction::N16SP(to) => f.write_fmt(format_args!("LD [${:04X}], SP", to)),
+            LDInstruction::HLR8(from) => f.write_fmt(format_args!("LD [HL], {}", from.as_ref())),
+            LDInstruction::HLN8(value) => f.write_fmt(format_args!("LD [HL], 0x{:02X}", value)),
+            LDInstruction::R8HL(to) => f.write_fmt(format_args!("LD {}, [HL]", to.as_ref())),
             LDInstruction::R16A(register16) => todo!(),
             LDInstruction::N16A(_) => todo!(),
             LDInstruction::AR16(register16) => todo!(),
             LDInstruction::AN16(_) => todo!(),
-            LDInstruction::HLIA => todo!(),
-            LDInstruction::HLDA => todo!(),
-            LDInstruction::AHLI => todo!(),
-            LDInstruction::AHLD => todo!(),
+            LDInstruction::HLIA => f.write_str("LD [HL+], A"),
+            LDInstruction::HLDA => f.write_str("LD [HL-], A"),
+            LDInstruction::AHLI => f.write_str("LD A, [HL+]"),
+            LDInstruction::AHLD => f.write_str("LD A, [HL-]"),
             LDInstruction::HLSPE8(_) => todo!(),
             LDInstruction::SPHL => todo!(),
         }

@@ -1,28 +1,28 @@
-use bitfield_struct::bitfield;
+use bitfield_struct::{bitenum, bitfield};
 
 use crate::ppu::PPUMode;
 
 #[bitfield(u8)]
 pub struct LCDControlRegister {
-    bg_window_enable_priority: bool,
-    obj_enable: bool,
-    obj_size: bool,
-    bg_tile_map: bool,
-    bg_window_tiles: bool,
-    window_enable: bool,
-    window_tile_map: bool,
-    lcd_ppu_enable: bool,
+    pub bg_window_enable_priority: bool,
+    pub obj_enable: bool,
+    pub obj_size: bool,
+    pub bg_tile_map: bool,
+    pub bg_window_tiles: bool,
+    pub window_enable: bool,
+    pub window_tile_map: bool,
+    pub lcd_ppu_enable: bool,
 }
 
 #[bitfield(u8)]
 pub struct LCDStatusRegister {
     #[bits(2)]
-    ppu_mode: PPUMode,
-    lyc_int_select: bool,
-    mode0_int_select: bool,
-    mode1_int_select: bool,
-    mode2_int_select: bool,
-    lyc_equals_ly: bool,
+    pub ppu_mode: PPUMode,
+    pub lyc_int_select: bool,
+    pub mode0_int_select: bool,
+    pub mode1_int_select: bool,
+    pub mode2_int_select: bool,
+    pub lyc_equals_ly: bool,
     _unused: bool,
 }
 
@@ -33,4 +33,27 @@ impl LCDStatusRegister {
             .with_mode1_int_select(value.mode1_int_select())
             .with_mode2_int_select(value.mode2_int_select())
     }
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[bitenum]
+pub enum GreyscaleColor {
+    #[fallback]
+    White = 0,
+    LightGrey = 1,
+    DarkGrey = 2,
+    Black = 3,
+}
+
+#[bitfield(u8)]
+pub struct GreyscalePaletteData {
+    #[bits(2)]
+    pub color0: GreyscaleColor,
+    #[bits(2)]
+    pub color1: GreyscaleColor,
+    #[bits(2)]
+    pub color2: GreyscaleColor,
+    #[bits(2)]
+    pub color3: GreyscaleColor,
 }
