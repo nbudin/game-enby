@@ -160,13 +160,15 @@ impl Assemble for LDHInstruction {
 impl Assemble for ADCInstruction {
     fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error> {
         match self {
-            ADCInstruction::AA => dest.write(&[0x8F]),
-            ADCInstruction::AB => dest.write(&[0x88]),
-            ADCInstruction::AC => dest.write(&[0x89]),
-            ADCInstruction::AD => dest.write(&[0x8A]),
-            ADCInstruction::AE => dest.write(&[0x8B]),
-            ADCInstruction::AH => dest.write(&[0x8C]),
-            ADCInstruction::AL => dest.write(&[0x8D]),
+            ADCInstruction::AR8(from) => match from {
+                Register8::A => dest.write(&[0x8F]),
+                Register8::B => dest.write(&[0x88]),
+                Register8::C => dest.write(&[0x89]),
+                Register8::D => dest.write(&[0x8A]),
+                Register8::E => dest.write(&[0x8B]),
+                Register8::H => dest.write(&[0x8C]),
+                Register8::L => dest.write(&[0x8D]),
+            },
             ADCInstruction::AHL => dest.write(&[0x8E]),
             ADCInstruction::An8(value) => dest.write(&[0xCE, *value]),
         }

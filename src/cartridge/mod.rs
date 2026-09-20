@@ -4,11 +4,12 @@ use enum_dispatch::enum_dispatch;
 
 use crate::{
     apu::APU,
-    cartridge::no_mbc::NoMBC,
+    cartridge::{header::CartridgeHeader, no_mbc::NoMBC},
     cpu::{CPU, cpu_bus::CPUBusTrait},
     ppu::PPU,
 };
 
+pub mod header;
 pub mod no_mbc;
 
 #[enum_dispatch]
@@ -29,6 +30,13 @@ impl Cartridge {
         cpu: Arc<RwLock<CPU>>,
         ppu: Arc<RwLock<PPU>>,
     ) -> Self {
-        NoMBC::from_rom(rom, apu, cpu, ppu).into()
+        let header = CartridgeHeader::from_rom(&rom).unwrap();
+
+        println!("{:?}", header);
+
+        match header.cartridge_type {
+            header::CartridgeType::NoMBC => NoMBC::from_rom(rom, apu, cpu, ppu).into(),
+            _ => todo!("{}", header.cartridge_type.as_ref()),
+        }
     }
 }

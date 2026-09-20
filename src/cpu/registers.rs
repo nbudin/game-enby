@@ -24,20 +24,20 @@ pub struct AFRegister {
 
 #[bitfield(u16)]
 pub struct BCRegister {
-    c: u8,
-    b: u8,
+    pub c: u8,
+    pub b: u8,
 }
 
 #[bitfield(u16)]
 pub struct DERegister {
-    e: u8,
-    d: u8,
+    pub e: u8,
+    pub d: u8,
 }
 
 #[bitfield(u16)]
 pub struct HLRegister {
-    l: u8,
-    h: u8,
+    pub l: u8,
+    pub h: u8,
 }
 
 #[bitfield(u8)]

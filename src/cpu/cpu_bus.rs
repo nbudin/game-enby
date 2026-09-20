@@ -45,7 +45,9 @@ impl Bus<u16> for CPUBus {
     fn try_read_readonly(&self, addr: u16) -> Option<u8> {
         match addr {
             0x0000..=0x7FFF => todo!("Cartridge ROM"),
-            0x8000..=0x9FFF => todo!("VRAM"),
+            0x8000..=0x97FF => todo!("VRAM"),
+            0x9800..=0x9BFF => Some(self.ppu.read().unwrap().tilemap0[(addr as usize) - 0x9800]),
+            0x9C00..=0x9FFF => Some(self.ppu.read().unwrap().tilemap1[(addr as usize) - 0x9C00]),
             0xA000..=0xBFFF => todo!("External RAM"),
             0xC000..=0xDFFF => Some(self.work_ram[(addr as usize) - 0xC000]),
             0xE000..=0xFDFF => self.try_read_readonly(addr - 0x2000),
@@ -92,12 +94,14 @@ impl Bus<u16> for CPUBus {
     fn write(&mut self, addr: u16, value: u8) {
         match addr {
             0x0000..=0x7FFF => todo!("Cartridge ROM"),
-            0x8000..=0x9FFF => todo!("VRAM"),
+            0x8000..=0x97FF => todo!("VRAM"),
+            0x9800..=0x9BFF => self.ppu.write().unwrap().tilemap0[(addr as usize) - 0x9800] = value,
+            0x9C00..=0x9FFF => self.ppu.write().unwrap().tilemap1[(addr as usize) - 0x9C00] = value,
             0xA000..=0xBFFF => todo!("External RAM"),
             0xC000..=0xDFFF => self.work_ram[(addr as usize) - 0xC000] = value,
             0xE000..=0xFDFF => self.write(addr - 0x2000, value),
             0xFE00..=0xFE9F => todo!("OAM"),
-            0xFEA0..=0xFEFF => todo!("Not usable"),
+            0xFEA0..=0xFEFF => {}
             0xFF0F => {
                 self.cpu.write().unwrap().registers.interrupt_flag = IFRegister::from_bits(value)
             }

@@ -64,19 +64,41 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
 
         0x20 => JRInstruction::CCE8(ConditionCode::NZ, read_i8(src)?).into(),
         0x21 => LDInstruction::R16N16(Register16::HL, read_u16le(src)?).into(),
+        0x2A => LDInstruction::AHLI.into(),
 
         0x31 => LDInstruction::SPN16(read_u16le(src)?).into(),
         0x32 => LDInstruction::HLDA.into(),
         0x36 => LDInstruction::HLN8(read_u8(src)?).into(),
+        0x3A => LDInstruction::AHLD.into(),
         0x3E => LDInstruction::R8N8(Register8::A, read_u8(src)?).into(),
+
+        0x80 => ADDInstruction::AR8(Register8::B).into(),
+        0x81 => ADDInstruction::AR8(Register8::C).into(),
+        0x82 => ADDInstruction::AR8(Register8::D).into(),
+        0x83 => ADDInstruction::AR8(Register8::E).into(),
+        0x84 => ADDInstruction::AR8(Register8::H).into(),
+        0x85 => ADDInstruction::AR8(Register8::L).into(),
+        0x86 => ADDInstruction::AHL.into(),
+        0x87 => ADDInstruction::AR8(Register8::A).into(),
+        0x88 => ADCInstruction::AR8(Register8::B).into(),
+        0x89 => ADCInstruction::AR8(Register8::C).into(),
+        0x8A => ADCInstruction::AR8(Register8::D).into(),
+        0x8B => ADCInstruction::AR8(Register8::E).into(),
+        0x8C => ADCInstruction::AR8(Register8::H).into(),
+        0x8D => ADCInstruction::AR8(Register8::L).into(),
+        0x8E => ADCInstruction::AHL.into(),
+        0x8F => ADCInstruction::AR8(Register8::A).into(),
 
         0xAF => XORInstruction::AR8(Register8::A).into(),
 
         0xC3 => JPInstruction::N16(read_u16le(src)?).into(),
 
         0xE0 => LDHInstruction::N8A(read_u8(src)?).into(),
+        0xE2 => LDHInstruction::CA.into(),
+        0xEA => LDInstruction::N16A(read_u16le(src)?).into(),
 
         0xF0 => LDHInstruction::AN8(read_u8(src)?).into(),
+        0xF2 => LDHInstruction::AC.into(),
         0xF3 => CCFInstruction::Empty.into(),
         0xFE => CPInstruction::AN8(read_u8(src)?).into(),
 
@@ -90,6 +112,7 @@ impl Display for Instruction {
             Instruction::CCFInstruction(_) => f.write_str("CCF"),
             Instruction::CPInstruction(instruction) => Display::fmt(&instruction, f),
             Instruction::DECInstruction(instruction) => Display::fmt(&instruction, f),
+            Instruction::INCInstruction(instruction) => Display::fmt(&instruction, f),
             Instruction::LDInstruction(instruction) => Display::fmt(&instruction, f),
             Instruction::LDHInstruction(instruction) => Display::fmt(&instruction, f),
             Instruction::JPInstruction(instruction) => Display::fmt(&instruction, f),
@@ -128,6 +151,20 @@ impl Display for DECInstruction {
     }
 }
 
+impl Display for INCInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            INCInstruction::R8(register8) => {
+                f.write_fmt(format_args!("INC {}", register8.as_ref()))
+            }
+            INCInstruction::HL => f.write_str("INC HL"),
+            INCInstruction::R16(register16) => {
+                f.write_fmt(format_args!("INC {}", register16.as_ref()))
+            }
+            INCInstruction::SP => f.write_str("INC SP"),
+        }
+    }
+}
 impl Display for JRInstruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -155,9 +192,9 @@ impl Display for LDInstruction {
             LDInstruction::HLN8(value) => f.write_fmt(format_args!("LD [HL], 0x{:02X}", value)),
             LDInstruction::R8HL(to) => f.write_fmt(format_args!("LD {}, [HL]", to.as_ref())),
             LDInstruction::R16A(register16) => todo!(),
-            LDInstruction::N16A(_) => todo!(),
+            LDInstruction::N16A(to) => f.write_fmt(format_args!("LD [${:04X}], A", to)),
             LDInstruction::AR16(register16) => todo!(),
-            LDInstruction::AN16(_) => todo!(),
+            LDInstruction::AN16(from) => f.write_fmt(format_args!("LD A, [${:04X}]", from)),
             LDInstruction::HLIA => f.write_str("LD [HL+], A"),
             LDInstruction::HLDA => f.write_str("LD [HL-], A"),
             LDInstruction::AHLI => f.write_str("LD A, [HL+]"),

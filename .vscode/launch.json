@@ -11,7 +11,7 @@
       "cargo": {
         "args": ["run", "--bin=game-enby"]
       },
-      "args": ["Super Mario Land (World) (Rev 1).gb"]
+      "args": ["tetris.gb"]
     },
     {
       "name": "Debug unit tests in executable 'game-enby'",
