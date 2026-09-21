@@ -6,6 +6,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
+
 use crate::{
     apu::APU,
     cartridge::{Cartridge, CartridgeBehavior},
@@ -134,7 +136,33 @@ fn main() {
 
     let mut machine = Machine::from_rom(rom_data);
 
-    loop {
+    let sdl_context = sdl3::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+    let window = video_subsystem
+        .window("game-enby", 800, 600)
+        .position_centered()
+        .build()
+        .unwrap();
+
+    let mut canvas = window.into_canvas();
+    canvas.set_draw_color(Color::RGB(0, 0, 255));
+    canvas.clear();
+    canvas.present();
+
+    let mut event_pump = sdl_context.event_pump().unwrap();
+
+    'mainloop: loop {
         machine.tick();
+
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => break 'mainloop,
+                _ => {}
+            }
+        }
     }
 }

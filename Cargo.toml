@@ -8,5 +8,6 @@ bitfield-struct = "0.13.0"
 bytemuck = "1.25.0"
 derive_more = { version = "2.1.1", features = ["display"] }
 enum_dispatch = "0.3.13"
+sdl3 = "0.20.0"
 strum = { version = "0.28.0", features = ["derive"] }
 zendian = { version = "1.0.0", features = ["bytemuck"] }
