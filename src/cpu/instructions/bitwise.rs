@@ -1,8 +1,7 @@
 use std::{fmt::Display, io::Write};
 
 use crate::cpu::{
-    asm::Assemble,
-    instructions::{BitOffset, InstructionBehavior},
+    instructions::{Assemble, BitOffset, InstructionBehavior},
     registers::Register8,
 };
 

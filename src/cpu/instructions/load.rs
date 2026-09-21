@@ -9,9 +9,8 @@ use zendian::le::u16le;
 
 use crate::cpu::{
     CPU,
-    asm::Assemble,
     cpu_bus::CPUBusTrait,
-    instructions::InstructionBehavior,
+    instructions::{Assemble, InstructionBehavior},
     registers::{HLRegister, Register8, Register16},
 };
 
@@ -48,7 +47,11 @@ impl InstructionBehavior for LDInstruction {
             LDInstruction::R8N8(to, value) => cpu.write().unwrap().registers.set_r8(*to, *value),
             LDInstruction::R16N16(to, value) => cpu.write().unwrap().registers.set_r16(*to, *value),
             LDInstruction::SPN16(value) => cpu.write().unwrap().registers.sp = *value,
-            LDInstruction::N16SP(_) => todo!(),
+            LDInstruction::N16SP(addr) => {
+                let sp = cpu.read().unwrap().registers.sp;
+                cpu_bus.write(*addr, (sp & 0xFF) as u8);
+                cpu_bus.write(*addr + 1, (sp >> 8) as u8);
+            }
             LDInstruction::HLR8(from) => {
                 let to = cpu.read().unwrap().registers.hl.into_bits();
                 let value = cpu.read().unwrap().registers.get_r8(*from);
@@ -63,12 +66,20 @@ impl InstructionBehavior for LDInstruction {
                 let value = cpu_bus.read(addr);
                 cpu.write().unwrap().registers.set_r8(*to, value);
             }
-            LDInstruction::R16A(register16) => todo!(),
+            LDInstruction::R16A(to) => {
+                let addr = cpu.read().unwrap().registers.get_r16(*to);
+                let value = cpu.read().unwrap().registers.af.a();
+                cpu_bus.write(addr, value);
+            }
             LDInstruction::N16A(addr) => {
                 let value = cpu.read().unwrap().registers.af.a();
                 cpu_bus.write(*addr, value);
             }
-            LDInstruction::AR16(register16) => todo!(),
+            LDInstruction::AR16(register16) => {
+                let addr = cpu.read().unwrap().registers.get_r16(*register16);
+                let value = cpu_bus.read(addr);
+                cpu.write().unwrap().registers.af.set_a(value);
+            }
             LDInstruction::AN16(addr) => {
                 let value = cpu_bus.read(*addr);
                 cpu.write().unwrap().registers.af.set_a(value);
@@ -145,16 +156,24 @@ impl Display for LDInstruction {
             LDInstruction::HLR8(from) => f.write_fmt(format_args!("LD [HL], {}", from.as_ref())),
             LDInstruction::HLN8(value) => f.write_fmt(format_args!("LD [HL], 0x{:02X}", value)),
             LDInstruction::R8HL(to) => f.write_fmt(format_args!("LD {}, [HL]", to.as_ref())),
-            LDInstruction::R16A(register16) => todo!(),
+            LDInstruction::R16A(register16) => {
+                f.write_fmt(format_args!("LD [{}], A", register16.as_ref()))
+            }
             LDInstruction::N16A(to) => f.write_fmt(format_args!("LD [${:04X}], A", to)),
-            LDInstruction::AR16(register16) => todo!(),
+            LDInstruction::AR16(register16) => {
+                f.write_fmt(format_args!("LD A, [{}]", register16.as_ref()))
+            }
             LDInstruction::AN16(from) => f.write_fmt(format_args!("LD A, [${:04X}]", from)),
             LDInstruction::HLIA => f.write_str("LD [HL+], A"),
             LDInstruction::HLDA => f.write_str("LD [HL-], A"),
             LDInstruction::AHLI => f.write_str("LD A, [HL+]"),
             LDInstruction::AHLD => f.write_str("LD A, [HL-]"),
-            LDInstruction::HLSPE8(_) => todo!(),
-            LDInstruction::SPHL => todo!(),
+            LDInstruction::HLSPE8(offset) => f.write_fmt(format_args!(
+                "LD HL, SP {} {}",
+                if *offset < 0 { "-" } else { "+" },
+                offset.abs(),
+            )),
+            LDInstruction::SPHL => f.write_str("LD SP, HL"),
         }
     }
 }

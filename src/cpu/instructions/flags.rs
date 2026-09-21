@@ -4,7 +4,11 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::cpu::{CPU, asm::Assemble, cpu_bus::CPUBusTrait, instructions::InstructionBehavior};
+use crate::cpu::{
+    CPU,
+    cpu_bus::CPUBusTrait,
+    instructions::{Assemble, InstructionBehavior},
+};
 
 #[derive(Debug)]
 pub enum CCFInstruction {

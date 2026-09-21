@@ -1,6 +1,9 @@
 use std::{fmt::Display, io::Write};
 
-use crate::cpu::{asm::Assemble, instructions::InstructionBehavior, registers::Register16};
+use crate::cpu::{
+    instructions::{Assemble, InstructionBehavior},
+    registers::Register16,
+};
 
 #[derive(Debug)]
 pub enum POPInstruction {

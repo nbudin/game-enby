@@ -9,7 +9,6 @@ use strum::FromRepr;
 
 use crate::cpu::{
     CPU,
-    asm::Assemble,
     cpu_bus::CPUBusTrait,
     instructions::{
         arithmetic::{
@@ -69,10 +68,15 @@ pub enum ResetVector {
 }
 
 #[enum_dispatch]
+pub trait Assemble {
+    fn assemble(&self, dest: &mut impl Write) -> Result<usize, std::io::Error>;
+}
+
+#[enum_dispatch]
 pub trait InstructionBehavior: Assemble + Display {
     fn duration(&self) -> usize;
 
-    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+    fn execute(&self, _cpu: Arc<RwLock<CPU>>, _cpu_bus: &mut dyn CPUBusTrait) {
         todo!("{}", type_name::<Self>());
     }
 }

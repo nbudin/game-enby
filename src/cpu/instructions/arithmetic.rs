@@ -6,9 +6,8 @@ use std::{
 
 use crate::cpu::{
     CPU,
-    asm::Assemble,
     cpu_bus::CPUBusTrait,
-    instructions::InstructionBehavior,
+    instructions::{Assemble, InstructionBehavior},
     registers::{CPURegisters, Register8, Register16},
 };
 

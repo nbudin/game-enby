@@ -2,7 +2,6 @@ use crate::cpu::registers::{
     AFRegister, BCRegister, CPURegisters, DERegister, HLRegister, IERegister, IFRegister,
 };
 
-pub mod asm;
 pub mod cpu_bus;
 pub mod disasm;
 pub mod instructions;

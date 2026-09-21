@@ -9,9 +9,8 @@ use zendian::le::u16le;
 
 use crate::cpu::{
     CPU,
-    asm::Assemble,
     cpu_bus::CPUBusTrait,
-    instructions::{EIInstruction, InstructionBehavior, ResetVector},
+    instructions::{Assemble, EIInstruction, InstructionBehavior, ResetVector},
     operand::ConditionCode,
 };
 
@@ -24,12 +23,12 @@ pub enum CALLInstruction {
 impl CALLInstruction {
     fn perform_call(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait, addr: u16) {
         let pc = cpu.read().unwrap().registers.pc;
-        let sp = cpu.read().unwrap().registers.sp;
-        cpu_bus.write(sp - 1, (pc & 0xFF) as u8);
-        cpu_bus.write(sp, (pc >> 8) as u8);
+        let new_sp = cpu.read().unwrap().registers.sp - 2;
+        cpu_bus.write(new_sp - 1, (pc & 0xFF) as u8);
+        cpu_bus.write(new_sp, (pc >> 8) as u8);
 
         let registers = &mut cpu.write().unwrap().registers;
-        registers.sp -= 2;
+        registers.sp = new_sp;
         registers.pc = addr;
     }
 }
@@ -276,11 +275,33 @@ pub enum RETInstruction {
     Unconditional,
 }
 
+impl RETInstruction {
+    fn perform_return(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+        let sp = cpu.read().unwrap().registers.sp;
+        let new_pc = cpu_bus.read(sp) as u16 + ((cpu_bus.read(sp + 1) as u16) << 8);
+
+        let registers = &mut cpu.write().unwrap().registers;
+        registers.sp += 2;
+        registers.pc = new_pc;
+    }
+}
+
 impl InstructionBehavior for RETInstruction {
     fn duration(&self) -> usize {
         match self {
             RETInstruction::Conditional(_) => 8,
             RETInstruction::Unconditional => 16,
+        }
+    }
+
+    fn execute(&self, cpu: Arc<RwLock<CPU>>, cpu_bus: &mut dyn CPUBusTrait) {
+        match self {
+            RETInstruction::Conditional(condition_code) => {
+                if condition_code.matches(&cpu.read().unwrap().registers) {
+                    self.perform_return(cpu, cpu_bus);
+                }
+            }
+            RETInstruction::Unconditional => self.perform_return(cpu, cpu_bus),
         }
     }
 }
