@@ -23,6 +23,7 @@ mod bus;
 mod cartridge;
 mod cpu;
 mod ppu;
+mod serial;
 
 pub struct TraceState {
     a: u8,
@@ -133,7 +134,7 @@ fn main() {
 
     let mut machine = Machine::from_rom(rom_data);
 
-    for _i in 1..100000 {
+    loop {
         machine.tick();
     }
 }

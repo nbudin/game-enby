@@ -35,8 +35,13 @@ impl BusInterceptor<u16> for NoMBCCPUBusInterceptor {
         }
     }
 
-    fn intercept_write(&mut self, _addr: u16, _value: u8) -> InterceptorResult<()> {
-        InterceptorResult::NotIntercepted
+    fn intercept_write(&mut self, addr: u16, _value: u8) -> InterceptorResult<()> {
+        if addr <= 0x7FFF {
+            // with no MBC, writes to ROM space do nothing
+            InterceptorResult::Intercepted(())
+        } else {
+            InterceptorResult::NotIntercepted
+        }
     }
 }
 

@@ -7,7 +7,19 @@ use bytemuck::checked::from_bytes;
 use zendian::le::u16le;
 
 use crate::cpu::{
-    instructions::*,
+    instructions::{
+        arithmetic::{ADCInstruction, ADDInstruction, DECInstruction, INCInstruction},
+        bitwise::{RLAInstruction, RLCAInstruction, RRCAInstruction},
+        control::{
+            CALLInstruction, JPInstruction, JRInstruction, NOPInstruction, RETIInstruction,
+            RETInstruction, STOPInstruction,
+        },
+        flags::CCFInstruction,
+        load::{LDHInstruction, LDInstruction},
+        logic::{ORInstruction, XORInstruction},
+        test::CPInstruction,
+        *,
+    },
     operand::ConditionCode,
     registers::{Register8, Register16},
 };
@@ -72,6 +84,15 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
         0x3A => LDInstruction::AHLD.into(),
         0x3E => LDInstruction::R8N8(Register8::A, read_u8(src)?).into(),
 
+        0x78 => LDInstruction::R8R8(Register8::A, Register8::B).into(),
+        0x79 => LDInstruction::R8R8(Register8::A, Register8::C).into(),
+        0x7A => LDInstruction::R8R8(Register8::A, Register8::D).into(),
+        0x7B => LDInstruction::R8R8(Register8::A, Register8::E).into(),
+        0x7C => LDInstruction::R8R8(Register8::A, Register8::H).into(),
+        0x7D => LDInstruction::R8R8(Register8::A, Register8::L).into(),
+        0x7E => LDInstruction::R8HL(Register8::A).into(),
+        0x7F => LDInstruction::R8R8(Register8::A, Register8::A).into(),
+
         0x80 => ADDInstruction::AR8(Register8::B).into(),
         0x81 => ADDInstruction::AR8(Register8::C).into(),
         0x82 => ADDInstruction::AR8(Register8::D).into(),
@@ -91,7 +112,28 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
 
         0xAF => XORInstruction::AR8(Register8::A).into(),
 
+        0xB0 => ORInstruction::AR8(Register8::B).into(),
+        0xB1 => ORInstruction::AR8(Register8::C).into(),
+        0xB2 => ORInstruction::AR8(Register8::D).into(),
+        0xB3 => ORInstruction::AR8(Register8::E).into(),
+        0xB4 => ORInstruction::AR8(Register8::H).into(),
+        0xB5 => ORInstruction::AR8(Register8::L).into(),
+        0xB6 => ORInstruction::AHL.into(),
+        0xB7 => ORInstruction::AR8(Register8::A).into(),
+
+        0xC0 => RETInstruction::Conditional(ConditionCode::NZ).into(),
         0xC3 => JPInstruction::N16(read_u16le(src)?).into(),
+        0xC4 => CALLInstruction::CCN16(ConditionCode::NZ, read_u16le(src)?).into(),
+        0xCC => CALLInstruction::CCN16(ConditionCode::Z, read_u16le(src)?).into(),
+        0xCD => CALLInstruction::N16(read_u16le(src)?).into(),
+        0xC8 => RETInstruction::Conditional(ConditionCode::Z).into(),
+        0xC9 => RETInstruction::Unconditional.into(),
+
+        0xD0 => RETInstruction::Conditional(ConditionCode::NC).into(),
+        0xD4 => CALLInstruction::CCN16(ConditionCode::NC, read_u16le(src)?).into(),
+        0xD8 => RETInstruction::Conditional(ConditionCode::C).into(),
+        0xD9 => RETIInstruction::Empty.into(),
+        0xDC => CALLInstruction::CCN16(ConditionCode::C, read_u16le(src)?).into(),
 
         0xE0 => LDHInstruction::N8A(read_u8(src)?).into(),
         0xE2 => LDHInstruction::CA.into(),
@@ -104,138 +146,4 @@ pub fn read_instruction(src: &mut impl Read) -> Result<Instruction, std::io::Err
 
         _ => todo!("Unknown opcode: {:02X}", opcode),
     })
-}
-
-impl Display for Instruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Instruction::CCFInstruction(_) => f.write_str("CCF"),
-            Instruction::CPInstruction(instruction) => Display::fmt(&instruction, f),
-            Instruction::DECInstruction(instruction) => Display::fmt(&instruction, f),
-            Instruction::INCInstruction(instruction) => Display::fmt(&instruction, f),
-            Instruction::LDInstruction(instruction) => Display::fmt(&instruction, f),
-            Instruction::LDHInstruction(instruction) => Display::fmt(&instruction, f),
-            Instruction::JPInstruction(instruction) => Display::fmt(&instruction, f),
-            Instruction::JRInstruction(instruction) => Display::fmt(&instruction, f),
-            Instruction::NOPInstruction(_) => f.write_str("NOP"),
-            Instruction::XORInstruction(instruction) => Display::fmt(&instruction, f),
-            _ => todo!("{:?}", self),
-        }
-    }
-}
-
-impl Display for CPInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CPInstruction::AR8(register8) => {
-                f.write_fmt(format_args!("CP A, {}", register8.as_ref()))
-            }
-            CPInstruction::AHL => f.write_str("CP A, [HL]"),
-            CPInstruction::AN8(value) => f.write_fmt(format_args!("CP A, 0x{:02X}", value)),
-        }
-    }
-}
-
-impl Display for DECInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DECInstruction::R8(register8) => {
-                f.write_fmt(format_args!("DEC {}", register8.as_ref()))
-            }
-            DECInstruction::HL => f.write_str("DEC HL"),
-            DECInstruction::R16(register16) => {
-                f.write_fmt(format_args!("DEC {}", register16.as_ref()))
-            }
-            DECInstruction::SP => f.write_str("DEC SP"),
-        }
-    }
-}
-
-impl Display for INCInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            INCInstruction::R8(register8) => {
-                f.write_fmt(format_args!("INC {}", register8.as_ref()))
-            }
-            INCInstruction::HL => f.write_str("INC HL"),
-            INCInstruction::R16(register16) => {
-                f.write_fmt(format_args!("INC {}", register16.as_ref()))
-            }
-            INCInstruction::SP => f.write_str("INC SP"),
-        }
-    }
-}
-impl Display for JRInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JRInstruction::E8(offset) => f.write_fmt(format_args!("JR {}", offset)),
-            JRInstruction::CCE8(condition_code, offset) => {
-                f.write_fmt(format_args!("JR {}, {}", condition_code.as_ref(), offset))
-            }
-        }
-    }
-}
-
-impl Display for LDInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LDInstruction::R8R8(to, from) => todo!(),
-            LDInstruction::R8N8(to, value) => {
-                f.write_fmt(format_args!("LD {}, 0x{:02X}", to.as_ref(), value))
-            }
-            LDInstruction::R16N16(to, value) => {
-                f.write_fmt(format_args!("LD {}, 0x{:04X}", to.as_ref(), value))
-            }
-            LDInstruction::SPN16(value) => f.write_fmt(format_args!("LD SP, 0x{:04X}", value)),
-            LDInstruction::N16SP(to) => f.write_fmt(format_args!("LD [${:04X}], SP", to)),
-            LDInstruction::HLR8(from) => f.write_fmt(format_args!("LD [HL], {}", from.as_ref())),
-            LDInstruction::HLN8(value) => f.write_fmt(format_args!("LD [HL], 0x{:02X}", value)),
-            LDInstruction::R8HL(to) => f.write_fmt(format_args!("LD {}, [HL]", to.as_ref())),
-            LDInstruction::R16A(register16) => todo!(),
-            LDInstruction::N16A(to) => f.write_fmt(format_args!("LD [${:04X}], A", to)),
-            LDInstruction::AR16(register16) => todo!(),
-            LDInstruction::AN16(from) => f.write_fmt(format_args!("LD A, [${:04X}]", from)),
-            LDInstruction::HLIA => f.write_str("LD [HL+], A"),
-            LDInstruction::HLDA => f.write_str("LD [HL-], A"),
-            LDInstruction::AHLI => f.write_str("LD A, [HL+]"),
-            LDInstruction::AHLD => f.write_str("LD A, [HL-]"),
-            LDInstruction::HLSPE8(_) => todo!(),
-            LDInstruction::SPHL => todo!(),
-        }
-    }
-}
-
-impl Display for LDHInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LDHInstruction::N8A(offset) => f.write_fmt(format_args!("LDH A, [0x{:02X}]", offset)),
-            LDHInstruction::CA => f.write_str("LDH [C], A"),
-            LDHInstruction::AN8(offset) => f.write_fmt(format_args!("LDH [0x{:02X}], A", offset)),
-            LDHInstruction::AC => f.write_str("LDH A, [C]"),
-        }
-    }
-}
-
-impl Display for JPInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JPInstruction::HL => f.write_str("JP HL"),
-            JPInstruction::N16(addr) => f.write_fmt(format_args!("JP ${:04X}", addr)),
-            JPInstruction::CCN16(condition_code, addr) => {
-                f.write_fmt(format_args!("JP {},${:04X}", condition_code.as_ref(), addr))
-            }
-        }
-    }
-}
-
-impl Display for XORInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            XORInstruction::AR8(register8) => {
-                f.write_fmt(format_args!("XOR A, {}", register8.as_ref()))
-            }
-            XORInstruction::AHL => f.write_str("XOR A, HL"),
-            XORInstruction::AN8(value) => f.write_fmt(format_args!("XOR A, 0x{:02X}", value)),
-        }
-    }
 }

@@ -16,6 +16,7 @@ use crate::{
         PPU,
         registers::{GreyscalePaletteData, LCDControlRegister, LCDStatusRegister},
     },
+    serial::{SerialBus, SerialTransferControlRegister},
 };
 
 pub trait CPUBusTrait: Bus<u16> {}
@@ -26,6 +27,7 @@ pub struct CPUBus {
     pub apu: Arc<RwLock<APU>>,
     pub cpu: Arc<RwLock<CPU>>,
     pub ppu: Arc<RwLock<PPU>>,
+    serial: SerialBus,
 }
 
 impl CPUBus {
@@ -37,6 +39,7 @@ impl CPUBus {
             apu,
             cpu,
             ppu,
+            serial: SerialBus::new(),
         }
     }
 }
@@ -45,14 +48,30 @@ impl Bus<u16> for CPUBus {
     fn try_read_readonly(&self, addr: u16) -> Option<u8> {
         match addr {
             0x0000..=0x7FFF => todo!("Cartridge ROM"),
-            0x8000..=0x97FF => todo!("VRAM"),
+            0x8000..=0x87FF => Some(
+                self.ppu.read().unwrap().tile_data_block0[((addr as usize) - 0x8000) / 16].0
+                    [(addr as usize) % 16],
+            ),
+            0x8800..=0x8FFF => Some(
+                self.ppu.read().unwrap().tile_data_block1[((addr as usize) - 0x8800) / 16].0
+                    [(addr as usize) % 16],
+            ),
+            0x9000..=0x97FF => Some(
+                self.ppu.read().unwrap().tile_data_block2[((addr as usize) - 0x9000) / 16].0
+                    [(addr as usize) % 16],
+            ),
             0x9800..=0x9BFF => Some(self.ppu.read().unwrap().tilemap0[(addr as usize) - 0x9800]),
             0x9C00..=0x9FFF => Some(self.ppu.read().unwrap().tilemap1[(addr as usize) - 0x9C00]),
             0xA000..=0xBFFF => todo!("External RAM"),
             0xC000..=0xDFFF => Some(self.work_ram[(addr as usize) - 0xC000]),
             0xE000..=0xFDFF => self.try_read_readonly(addr - 0x2000),
-            0xFE00..=0xFE9F => todo!("OAM"),
+            0xFE00..=0xFE9F => Some(
+                self.ppu.write().unwrap().oam[((addr as usize) - 0xFE00) / 4]
+                    .read_byte((addr as usize) % 4),
+            ),
             0xFEA0..=0xFEFF => todo!("Not usable"),
+            0xFF01 => Some(self.serial.data),
+            0xFF02 => Some(self.serial.control_register.into_bits()),
             0xFF0F => Some(
                 self.cpu
                     .read()
@@ -78,6 +97,7 @@ impl Bus<u16> for CPUBus {
             0xFF47 => Some(self.ppu.read().unwrap().bg_palette_data.into_bits()),
             0xFF48 => Some(self.ppu.read().unwrap().obj_palette0_data.into_bits()),
             0xFF49 => Some(self.ppu.read().unwrap().obj_palette1_data.into_bits()),
+            0xFF78..=0xFF7F => Some(0), // unused I/O register space
             0xFF00..=0xFF7F => todo!("I/O register {:04X}", addr),
             0xFF80..=0xFFFE => Some(self.high_ram[(addr - 0xFF80) as usize]),
             0xFFFF => Some(
@@ -94,14 +114,30 @@ impl Bus<u16> for CPUBus {
     fn write(&mut self, addr: u16, value: u8) {
         match addr {
             0x0000..=0x7FFF => todo!("Cartridge ROM"),
-            0x8000..=0x97FF => todo!("VRAM"),
+            0x8000..=0x87FF => {
+                self.ppu.write().unwrap().tile_data_block0[((addr as usize) - 0x8000) / 16].0
+                    [(addr as usize) % 16] = value
+            }
+            0x8800..=0x8FFF => {
+                self.ppu.write().unwrap().tile_data_block1[((addr as usize) - 0x8800) / 16].0
+                    [(addr as usize) % 16] = value
+            }
+            0x9000..=0x97FF => {
+                self.ppu.write().unwrap().tile_data_block2[((addr as usize) - 0x9000) / 16].0
+                    [(addr as usize) % 16] = value
+            }
             0x9800..=0x9BFF => self.ppu.write().unwrap().tilemap0[(addr as usize) - 0x9800] = value,
             0x9C00..=0x9FFF => self.ppu.write().unwrap().tilemap1[(addr as usize) - 0x9C00] = value,
             0xA000..=0xBFFF => todo!("External RAM"),
             0xC000..=0xDFFF => self.work_ram[(addr as usize) - 0xC000] = value,
             0xE000..=0xFDFF => self.write(addr - 0x2000, value),
-            0xFE00..=0xFE9F => todo!("OAM"),
+            0xFE00..=0xFE9F => self.ppu.write().unwrap().oam[((addr as usize) - 0xFE00) / 4]
+                .write_byte((addr as usize) % 4, value),
             0xFEA0..=0xFEFF => {}
+            0xFF01 => self.serial.data = value,
+            0xFF02 => {
+                self.serial.control_register = SerialTransferControlRegister::from_bits(value)
+            }
             0xFF0F => {
                 self.cpu.write().unwrap().registers.interrupt_flag = IFRegister::from_bits(value)
             }
@@ -142,6 +178,7 @@ impl Bus<u16> for CPUBus {
             0xFF49 => {
                 self.ppu.write().unwrap().obj_palette1_data = GreyscalePaletteData::from_bits(value)
             }
+            0xFF78..=0xFF7F => {} // unused I/O register space
             0xFF00..=0xFF7F => todo!("I/O register {:04X}", addr),
             0xFF80..=0xFFFE => self.high_ram[(addr - 0xFF80) as usize] = value,
             0xFFFF => {
